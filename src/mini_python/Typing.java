@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 
 class Typing {
-  private static TyperVisitor typerVisitor = new TyperVisitor();
   static boolean debug = false;
 
   // use this method to signal typing errors
@@ -14,11 +13,13 @@ class Typing {
 
   static TFile file(File f) {
     TFile tfile = new TFile();
+    TyperVisitor typerVisitor = new TyperVisitor(tfile);
+
     HashSet<String> definedFunctions = new HashSet<String>();
 
     for (Def def : f.l) {
       String name = def.f.id;
-      if (name.equals("len") || name.equals("list") || name.equals("range")) {
+      if (isSpecialCall(name)) {
         error(def.f.loc, "The names of the functions declared with def should be distinct from len, list, and range.");
       }
 
@@ -37,7 +38,6 @@ class Typing {
         else
           definedParameters.add(varName);
       }
-      // TODO check variable scope
 
       def.s.accept(typerVisitor);
       TStmt tStmt = typerVisitor.tStmt;
@@ -75,11 +75,19 @@ class Typing {
     return true;
   }
 
+  static boolean isSpecialCall(String name) {
+    return name.equals("len") || name.equals("list") || name.equals("range");
+  }
 }
 
 class TyperVisitor implements Visitor {
   public TStmt tStmt;
   public TExpr tExpr;
+  private TFile tfile;
+
+  public TyperVisitor(TFile tfile) {
+    this.tfile = tfile;
+  }
 
   @Override
   public void visit(Cnone c) {
@@ -131,8 +139,44 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Ecall e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String name = e.f.id;
+    if (Typing.isSpecialCall(name) && e.l.size() != 1)
+      Typing.error(e.f.loc, "Bad arity for len, list, range");
+
+    TDef callee=null;
+    for (TDef tdef : this.tfile.l) {
+      if (name.equals(tdef.f.name)){
+        callee = tdef;
+        break;
+      }
+    }
+    if (callee==null && !Typing.isSpecialCall(name))
+    Typing.error(e.f.loc, "Function is not defined");
+    // TODO support recursive calls
+
+    if (callee.f.params.size()!=e.l.size())    
+    Typing.error(e.f.loc, "Bad arity");
+
+    if (name.equals("list")){
+      boolean raiseError = false;
+      raiseError = !(e.l.getLast() instanceof Ecall);
+      if (!raiseError){
+        Ecall calee = (Ecall) e.l.getLast();
+        if (!calee.f.id.equals("range"))
+          raiseError = true;
+      }
+      Typing.error(e.f.loc, "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
+    }
+
+    LinkedList<TExpr> args = new LinkedList<TExpr>();
+    for (Expr expr : e.l) {
+      expr.accept(this);
+      args.add(this.tExpr);
+    }
+
+      // TODO check variable scope
+
+    this.tExpr = new TEcall(callee.f, args);
   }
 
   @Override
@@ -203,3 +247,5 @@ class TyperVisitor implements Visitor {
   }
 
 }
+
+// @Nath I think we should add the three function len, list, range in the tfile.l as if they were classic TDef
