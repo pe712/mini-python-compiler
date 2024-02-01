@@ -91,26 +91,22 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Cnone c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    this.tExpr = new TEcst(c);
   }
 
   @Override
   public void visit(Cbool c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    this.tExpr = new TEcst(c);
   }
 
   @Override
   public void visit(Cstring c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    this.tExpr = new TEcst(c);
   }
 
   @Override
   public void visit(Cint c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    this.tExpr = new TEcst(c);
   }
 
   @Override
@@ -121,18 +117,24 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Ebinop e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    e.e1.accept(this);
+    TExpr tExprSave = this.tExpr;
+    e.e2.accept(this);
+    this.tExpr = new TEbinop(e.op, tExprSave, this.tExpr);
   }
 
   @Override
   public void visit(Eunop e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    e.e.accept(this);
+    this.tExpr = new TEunop(e.op, this.tExpr);
   }
 
   @Override
   public void visit(Eident e) {
+    // TODO check scopes
+    // e.x
+    // new Variable()
+    // new TEident()
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }
@@ -143,29 +145,30 @@ class TyperVisitor implements Visitor {
     if (Typing.isSpecialCall(name) && e.l.size() != 1)
       Typing.error(e.f.loc, "Bad arity for len, list, range");
 
-    TDef callee=null;
+    TDef callee = null;
     for (TDef tdef : this.tfile.l) {
-      if (name.equals(tdef.f.name)){
+      if (name.equals(tdef.f.name)) {
         callee = tdef;
         break;
       }
     }
-    if (callee==null && !Typing.isSpecialCall(name))
-    Typing.error(e.f.loc, "Function is not defined");
+    if (callee == null && !Typing.isSpecialCall(name))
+      Typing.error(e.f.loc, "Function is not defined");
     // TODO support recursive calls
 
-    if (callee.f.params.size()!=e.l.size())    
-    Typing.error(e.f.loc, "Bad arity");
+    if (callee.f.params.size() != e.l.size())
+      Typing.error(e.f.loc, "Bad arity");
 
-    if (name.equals("list")){
+    if (name.equals("list")) {
       boolean raiseError = false;
       raiseError = !(e.l.getLast() instanceof Ecall);
-      if (!raiseError){
+      if (!raiseError) {
         Ecall calee = (Ecall) e.l.getLast();
         if (!calee.f.id.equals("range"))
           raiseError = true;
       }
-      Typing.error(e.f.loc, "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
+      Typing.error(e.f.loc,
+          "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
     }
 
     LinkedList<TExpr> args = new LinkedList<TExpr>();
@@ -174,7 +177,7 @@ class TyperVisitor implements Visitor {
       args.add(this.tExpr);
     }
 
-      // TODO check variable scope
+    // TODO check variable scope
 
     this.tExpr = new TEcall(callee.f, args);
   }
@@ -248,4 +251,6 @@ class TyperVisitor implements Visitor {
 
 }
 
-// @Nath I think we should add the three function len, list, range in the tfile.l as if they were classic TDef
+// @Nath I think we should add the three function len, list, range in the
+// tfile.l as if they were classic TDef
+
