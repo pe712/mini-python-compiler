@@ -15,6 +15,11 @@ class Typing {
     TFile tfile = new TFile();
     TyperVisitor typerVisitor = new TyperVisitor(tfile);
 
+    // always add the Function before evaluating the statement
+    // recursion + resolving variables
+    Function main = new Function("__main__", new LinkedList<Variable>());
+    tfile.l.add(new TDef(main, null));
+
     HashSet<String> definedFunctions = new HashSet<String>();
 
     for (Def def : file.l) {
@@ -39,8 +44,6 @@ class Typing {
           definedParameters.add(varName);
       }
 
-      // always add the Function before evaluating the statement: recursion +
-      // resolving variables
       Function function = new Function(name, params);
       tfile.l.add(new TDef(function, null));
 
@@ -50,9 +53,11 @@ class Typing {
 
     }
 
-    Function main = new Function("__main__", new LinkedList<Variable>());
+    // update __main__ statement
     file.s.accept(typerVisitor);
+    tfile.l.removeFirst();
     tfile.l.add(new TDef(main, typerVisitor.tStmt));
+
     return tfile;
   }
 
@@ -218,8 +223,11 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sassign s) {
+    Variable variable = getVariable(s.x);
+    if (variable == null)
+      variable = addVariable(s.x);
     s.e.accept(this);
-    this.tStmt = new TSassign(getVariable(s.x), this.tExpr);
+    this.tStmt = new TSassign(variable, this.tExpr);
   }
 
   @Override
@@ -263,17 +271,29 @@ class TyperVisitor implements Visitor {
   }
 
   private Variable getVariable(Ident ident) {
-    // TODO local vars
+    // __main__ (global) and current (local)
+    LinkedList<TDef> concernedDefs = new LinkedList<TDef>();
+    concernedDefs.add(this.tfile.l.getLast());
+    concernedDefs.add(this.tfile.l.getFirst());
 
-    // go through current func and __main__ to look for variables as parameters +
-    // local vars
-
-    for (Variable variable : this.tfile.l.getLast().f.params) {
-      if (variable.name.equals(ident.id))
-        return variable;
+    for (TDef tDef : concernedDefs) {
+      for (Variable variable : tDef.f.params) {
+        if (variable.name.equals(ident.id))
+          return variable;
+      }
     }
 
+    // TODO : determine the scope
+    // TODO: go through the scope variable to return
+
     return null;
+  }
+
+  private Variable addVariable(Ident ident) {
+    // TODO : determine the scope
+    Variable variable = Variable.mkVariable(ident.id);
+    // TODO : add to scope
+    return variable;
   }
 
 }
