@@ -11,13 +11,13 @@ class Typing {
     throw new Error(loc + "\nerror: " + msg);
   }
 
-  static TFile file(File f) {
+  static TFile file(File file) {
     TFile tfile = new TFile();
     TyperVisitor typerVisitor = new TyperVisitor(tfile);
 
     HashSet<String> definedFunctions = new HashSet<String>();
 
-    for (Def def : f.l) {
+    for (Def def : file.l) {
       String name = def.f.id;
       if (isSpecialCall(name)) {
         error(def.f.loc, "The names of the functions declared with def should be distinct from len, list, and range.");
@@ -39,14 +39,20 @@ class Typing {
           definedParameters.add(varName);
       }
 
+      // always add the Function before evaluating the statement: recursion +
+      // resolving variables
+      Function function = new Function(name, params);
+      tfile.l.add(new TDef(function, null));
+
       def.s.accept(typerVisitor);
-      TStmt tStmt = typerVisitor.tStmt;
-      tfile.l.add(new TDef(new Function(name, params), tStmt));
+      tfile.l.removeLast();
+      tfile.l.add(new TDef(function, typerVisitor.tStmt));
+
     }
 
-    // Desormais on explore les statements
-    testStatement(f.s);
-
+    Function main = new Function("__main__", new LinkedList<Variable>());
+    file.s.accept(typerVisitor);
+    tfile.l.add(new TDef(main, typerVisitor.tStmt));
     return tfile;
   }
 
@@ -111,8 +117,7 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Ecst e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    e.c.accept(this);
   }
 
   @Override
@@ -131,12 +136,11 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Eident e) {
-    // TODO check scopes
-    // e.x
-    // new Variable()
-    // new TEident()
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    Variable variable = getVariable(e.x);
+    if (variable == null)
+      Typing.error(e.x.loc, e.x.id + "is not defined");
+    else
+      this.tExpr = new TEident(variable);
   }
 
   @Override
@@ -154,7 +158,6 @@ class TyperVisitor implements Visitor {
     }
     if (callee == null && !Typing.isSpecialCall(name))
       Typing.error(e.f.loc, "Function is not defined");
-    // TODO support recursive calls
 
     if (callee.f.params.size() != e.l.size())
       Typing.error(e.f.loc, "Bad arity");
@@ -177,15 +180,15 @@ class TyperVisitor implements Visitor {
       args.add(this.tExpr);
     }
 
-    // TODO check variable scope
-
     this.tExpr = new TEcall(callee.f, args);
   }
 
   @Override
   public void visit(Eget e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    e.e1.accept(this);
+    TExpr tExprSave = this.tExpr;
+    e.e2.accept(this);
+    this.tExpr = new TEget(tExprSave, this.tExpr);
   }
 
   @Override
@@ -209,44 +212,68 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sreturn s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e.accept(this);
+    this.tStmt = new TSreturn(this.tExpr);
   }
 
   @Override
   public void visit(Sassign s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e.accept(this);
+    this.tStmt = new TSassign(getVariable(s.x), this.tExpr);
   }
 
   @Override
   public void visit(Sprint s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e.accept(this);
+    this.tStmt = new TSprint(this.tExpr);
   }
 
   @Override
   public void visit(Sblock s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    LinkedList<TStmt> tStmts = new LinkedList<TStmt>();
+    for (Stmt stmt : s.l) {
+      stmt.accept(this);
+      tStmts.add(this.tStmt);
+    }
+    this.tStmt = new TSblock(tStmts);
   }
 
   @Override
   public void visit(Sfor s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e.accept(this);
+    TExpr tExprSave = this.tExpr;
+    s.s.accept(this);
+    this.tStmt = new TSfor(getVariable(s.x), tExprSave, this.tStmt);
   }
 
   @Override
   public void visit(Seval s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e.accept(this);
+    this.tStmt = new TSeval(this.tExpr);
   }
 
   @Override
   public void visit(Sset s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    s.e1.accept(this);
+    TExpr tExprSave1 = this.tExpr;
+    s.e2.accept(this);
+    TExpr tExprSave2 = this.tExpr;
+    s.e3.accept(this);
+    this.tStmt = new TSset(tExprSave1, tExprSave2, this.tExpr);
+  }
+
+  private Variable getVariable(Ident ident) {
+    // TODO local vars
+
+    // go through current func and __main__ to look for variables as parameters +
+    // local vars
+
+    for (Variable variable : this.tfile.l.getLast().f.params) {
+      if (variable.name.equals(ident.id))
+        return variable;
+    }
+
+    return null;
   }
 
 }
@@ -254,3 +281,13 @@ class TyperVisitor implements Visitor {
 // @Nath I think we should add the three function len, list, range in the
 // tfile.l as if they were classic TDef
 
+// @Nath I have introduced a global Function main so that every global var is
+// registered at this level. It is also a way to avoid to have a statement out
+// of everything. The main statement is inside main TDef.
+// This means that one cannot define a "main" function...
+// Maybe we should use a reserved word such as __main__ as f.id
+
+// @Nath, I don't know where to put Variable that are local but that are not
+// parameters of a Function call
+// I am tempted to modify the Def elmt of the syntax
+// check getVariable
