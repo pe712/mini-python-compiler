@@ -143,7 +143,7 @@ class TyperVisitor implements Visitor {
   public void visit(Eident e) {
     Variable variable = getVariable(e.x);
     if (variable == null)
-      Typing.error(e.x.loc, e.x.id + "is not defined");
+      Typing.error(e.x.loc, e.x.id + " is not defined");
     else
       this.tExpr = new TEident(variable);
   }
@@ -248,10 +248,14 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sfor s) {
+    // J'ajoute 3 lignes pour dire qu'on peut "déclarer" une nouvelle variable dans un for, mais je suis pas certain que ça soit util vu que ça change pas le nombre de test réussis
+    Variable variable = getVariable(s.x);
+    if (variable == null)
+      variable = addVariable(s.x);
     s.e.accept(this);
     TExpr tExprSave = this.tExpr;
     s.s.accept(this);
-    this.tStmt = new TSfor(getVariable(s.x), tExprSave, this.tStmt);
+    this.tStmt = new TSfor(variable, tExprSave, this.tStmt);
   }
 
   @Override
@@ -293,6 +297,7 @@ class TyperVisitor implements Visitor {
     // TODO : determine the scope
     Variable variable = Variable.mkVariable(ident.id);
     // TODO : add to scope
+    this.tfile.l.getLast().f.params.add(variable);
     return variable;
   }
 
@@ -300,6 +305,7 @@ class TyperVisitor implements Visitor {
 
 // @Nath I think we should add the three function len, list, range in the
 // tfile.l as if they were classic TDef
+// @PE je suis d'accord avec toi
 
 // @Nath I have introduced a global Function main so that every global var is
 // registered at this level. It is also a way to avoid to have a statement out
@@ -311,3 +317,4 @@ class TyperVisitor implements Visitor {
 // parameters of a Function call
 // I am tempted to modify the Def elmt of the syntax
 // check getVariable
+// @PE Je l'ai ajouté dans addVariable 
