@@ -165,11 +165,13 @@ class TyperVisitor implements Visitor {
         break;
       }
     }
-    if (callee == null && !Typing.isSpecialCall(name))
-      Typing.error(e.f.loc, "Function is not defined");
 
-    if (callee.f.params.size() != e.l.size())
-      Typing.error(e.f.loc, "Bad arity");
+    if (!Typing.isSpecialCall(name)) {
+      if (callee == null)
+        Typing.error(e.f.loc, "Function is not defined");
+      if (callee.f.params.size() != e.l.size())
+        Typing.error(e.f.loc, "Bad arity");
+    }
 
     if (name.equals("list")) {
       boolean raiseError = false;
@@ -179,8 +181,9 @@ class TyperVisitor implements Visitor {
         if (!calee.f.id.equals("range"))
           raiseError = true;
       }
-      Typing.error(e.f.loc,
-          "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
+      if (raiseError)
+        Typing.error(e.f.loc,
+            "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
     }
 
     LinkedList<TExpr> args = new LinkedList<TExpr>();
@@ -189,7 +192,8 @@ class TyperVisitor implements Visitor {
       args.add(this.tExpr);
     }
 
-    this.tExpr = new TEcall(callee.f, args);
+    if (!Typing.isSpecialCall(name)) 
+      this.tExpr = new TEcall(callee.f, args);
   }
 
   @Override
@@ -252,7 +256,6 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sfor s) {
-    // J'ajoute 3 lignes pour dire qu'on peut "déclarer" une nouvelle variable dans un for, mais je suis pas certain que ça soit util vu que ça change pas le nombre de test réussis
     Variable variable = getVariable(s.x);
     if (variable == null)
       variable = addVariable(s.x);
@@ -304,7 +307,7 @@ class TyperVisitor implements Visitor {
     // TODO : determine the scope
     Variable variable = Variable.mkVariable(ident.id);
     // TODO : add to scope
-    if (this.tfile.l.getLast().f.name.equals("main")){
+    if (this.tfile.l.getLast().f.name.equals("__main__")){
       this.tfile.l.getLast().f.params.add(variable);
     }
     else {
@@ -317,16 +320,18 @@ class TyperVisitor implements Visitor {
 
 // @Nath I think we should add the three function len, list, range in the
 // tfile.l as if they were classic TDef
-// @PE je suis d'accord avec toi
+// @PE J'ai hésité à le faire, mais j'ai fait le choix de ne pas le faire pour l'instant
+// car il n'y a pas de statement associé à ces fonctions.
 
 // @Nath I have introduced a global Function main so that every global var is
 // registered at this level. It is also a way to avoid to have a statement out
 // of everything. The main statement is inside main TDef.
 // This means that one cannot define a "main" function...
 // Maybe we should use a reserved word such as __main__ as f.id
+// @PE Tel que tu me l'a passé finalement c'est bien une fonction "__main__"
 
 // @Nath, I don't know where to put Variable that are local but that are not
 // parameters of a Function call
 // I am tempted to modify the Def elmt of the syntax
 // check getVariable
-// @PE Je l'ai ajouté dans addVariable 
+// @PE J'ai ajouté un HashSet localVariables dans TyperVisitor pour stocker momentanément les variables locales
