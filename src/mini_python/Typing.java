@@ -47,6 +47,7 @@ class Typing {
       Function function = new Function(name, params);
       tfile.l.add(new TDef(function, null));
 
+      typerVisitor.localVariables.clear();
       def.s.accept(typerVisitor);
       tfile.l.removeLast();
       tfile.l.add(new TDef(function, typerVisitor.tStmt));
@@ -54,6 +55,7 @@ class Typing {
     }
 
     // update __main__ statement
+    typerVisitor.localVariables.clear();
     file.s.accept(typerVisitor);
     tfile.l.removeFirst();
     tfile.l.add(new TDef(main, typerVisitor.tStmt));
@@ -95,9 +97,11 @@ class TyperVisitor implements Visitor {
   public TStmt tStmt;
   public TExpr tExpr;
   private TFile tfile;
+  public HashSet<Variable> localVariables;
 
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
+    this.localVariables = new HashSet<Variable>();
   }
 
   @Override
@@ -286,7 +290,10 @@ class TyperVisitor implements Visitor {
           return variable;
       }
     }
-
+    for (Variable variable : this.localVariables) {
+      if (variable.name.equals(ident.id))
+        return variable;
+    }
     // TODO : determine the scope
     // TODO: go through the scope variable to return
 
@@ -297,7 +304,12 @@ class TyperVisitor implements Visitor {
     // TODO : determine the scope
     Variable variable = Variable.mkVariable(ident.id);
     // TODO : add to scope
-    this.tfile.l.getLast().f.params.add(variable);
+    if (this.tfile.l.getLast().f.name.equals("main")){
+      this.tfile.l.getLast().f.params.add(variable);
+    }
+    else {
+      this.localVariables.add(variable);
+    }
     return variable;
   }
 
