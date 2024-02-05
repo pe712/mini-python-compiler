@@ -63,31 +63,6 @@ class Typing {
     return tfile;
   }
 
-  // @Nath TODO je comprend pas trop l'intérêt de ça...
-  static boolean testStatement(Stmt s) {
-    if (s instanceof Sif) {
-      boolean t1 = testStatement(((Sif) s).s1);
-      boolean t2 = testStatement(((Sif) s).s2);
-      return t1 && t2;
-    }
-    if (s instanceof Sreturn || s instanceof Sassign || s instanceof Sprint || s instanceof Sset
-        || s instanceof Seval) {
-      return true;
-    }
-    if (s instanceof Sblock) {
-      for (Stmt s2 : ((Sblock) s).l) {
-        if (!testStatement(s2)) {
-          return false;
-        }
-      }
-    }
-    if (s instanceof Sfor) {
-      return testStatement(((Sfor) s).s);
-    }
-
-    return true;
-  }
-
   static boolean isSpecialCall(String name) {
     return name.equals("len") || name.equals("list") || name.equals("range");
   }
@@ -98,10 +73,14 @@ class TyperVisitor implements Visitor {
   public TExpr tExpr;
   private TFile tfile;
   public HashSet<Variable> localVariables;
+  private Function len;
 
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
     this.localVariables = new HashSet<Variable>();
+    LinkedList<Variable> paramsLen = new LinkedList<Variable>();
+    paramsLen.add(Variable.mkVariable("l"));
+    len = new Function("len", paramsLen);
   }
 
   @Override
@@ -173,20 +152,25 @@ class TyperVisitor implements Visitor {
         Typing.error(e.f.loc, "Bad arity");
     }
 
+    LinkedList<TExpr> args = new LinkedList<TExpr>();
+
     if (name.equals("list")) {
       boolean raiseError = false;
       raiseError = !(e.l.getLast() instanceof Ecall);
+      Ecall calee = null;
       if (!raiseError) {
-        Ecall calee = (Ecall) e.l.getLast();
+        calee = (Ecall) e.l.getLast();
         if (!calee.f.id.equals("range"))
           raiseError = true;
       }
       if (raiseError)
         Typing.error(e.f.loc,
             "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
+      calee.accept(this);
+      args.add(this.tExpr);
+      this.tExpr = new TErange(args.getFirst());
     }
 
-    LinkedList<TExpr> args = new LinkedList<TExpr>();
     for (Expr expr : e.l) {
       expr.accept(this);
       args.add(this.tExpr);
@@ -194,6 +178,11 @@ class TyperVisitor implements Visitor {
 
     if (!Typing.isSpecialCall(name)) 
       this.tExpr = new TEcall(callee.f, args);
+    else {
+      if (name.equals("len")){
+        this.tExpr = new TEcall(this.len, args);
+      }
+    }
   }
 
   @Override
@@ -213,6 +202,7 @@ class TyperVisitor implements Visitor {
     }
     this.tExpr = new TElist(elmts);
   }
+
 
   @Override
   public void visit(Sif s) {
