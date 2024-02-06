@@ -1,7 +1,6 @@
 package mini_python;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 
 class Typing {
@@ -16,12 +15,10 @@ class Typing {
     TFile tfile = new TFile();
     TyperVisitor typerVisitor = new TyperVisitor(tfile);
 
-    // always add the Function before evaluating the statement
-    // recursion + resolving variables
+    // First create every function
+    // recursion + resolving variables + resolving to other func
     Function main = new Function("__main__", new LinkedList<Variable>());
-    tfile.l.add(new TDef(main, null));
-
-    HashSet<String> definedFunctions = new HashSet<String>();
+    typerVisitor.functions.put(main.name, main);
 
     for (Def def : file.l) {
       String name = def.f.id;
@@ -29,38 +26,34 @@ class Typing {
         error(def.f.loc, "The names of the functions declared with def should be distinct from len, list, and range.");
       }
 
-      if (definedFunctions.contains(name))
+      if (typerVisitor.functions.containsKey(name))
         error(def.f.loc, "The names of the functions declared with def should be distinct from each other.");
-      else
-        definedFunctions.add(name);
 
-      HashSet<String> definedParameters = new HashSet<String>();
-      LinkedList<Variable> params = new LinkedList<Variable>();
+      HashMap<String, Variable> params = new HashMap<String, Variable>();
+
       for (Ident param : def.l) {
         String varName = param.id;
-        params.add(Variable.mkVariable(varName));
-        if (definedParameters.contains(varName))
+        if (params.containsKey(varName))
           error(def.f.loc, "Formal parameters should be pairwise distincts");
         else
-          definedParameters.add(varName);
+          params.put(varName, Variable.mkVariable(varName));
       }
 
-      Function function = new Function(name, params);
-      tfile.l.add(new TDef(function, null));
-
-      typerVisitor.localVariables.clear();
-      def.s.accept(typerVisitor);
-      tfile.l.removeLast();
-      tfile.l.add(new TDef(function, typerVisitor.tStmt));
-
+      typerVisitor.functions.put(name, new Function(name, new LinkedList<Variable>(params.values())));
     }
 
-    // update __main__ statement
-    typerVisitor.localVariables.clear();
+    // Now we can start running the visitor
+    typerVisitor.visitFunction(main);
     file.s.accept(typerVisitor);
-    tfile.l.removeFirst();
     tfile.l.add(new TDef(main, typerVisitor.tStmt));
+    typerVisitor.global_scope = false;
 
+    for (Def def : file.l) {
+      Function f = typerVisitor.functions.get(def.f.id);
+      typerVisitor.visitFunction(f);
+      def.s.accept(typerVisitor);
+      tfile.l.add(new TDef(f, typerVisitor.tStmt));
+    }
     return tfile;
   }
 
@@ -73,15 +66,22 @@ class TyperVisitor implements Visitor {
   public TStmt tStmt;
   public TExpr tExpr;
   private TFile tfile;
-  public HashMap<String, Variable> localVariables;
+  public HashMap<String, Variable> localVariables = new HashMap<String, Variable>();
   private Function len;
+  public boolean global_scope = true;
+  public HashMap<String, Function> functions = new HashMap<String, Function>();
+  private Function currentFunction;
 
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
-    this.localVariables = new HashMap<String, Variable>();
     LinkedList<Variable> paramsLen = new LinkedList<Variable>();
     paramsLen.add(Variable.mkVariable("l"));
     len = new Function("len", paramsLen);
+  }
+
+  public void visitFunction(Function f) {
+    this.localVariables.clear();
+    this.currentFunction = f;
   }
 
   @Override
@@ -136,14 +136,8 @@ class TyperVisitor implements Visitor {
   public void visit(Ecall e) {
     String name = e.f.id;
 
-    // resolve to the corresponding TDef if possible
-    TDef callee = null;
-    for (TDef tdef : this.tfile.l) {
-      if (name.equals(tdef.f.name)) {
-        callee = tdef;
-        break;
-      }
-    }
+    // resolve to the corresponding function if possible
+    Function callee = this.functions.get(name);
 
     if (Typing.isSpecialCall(name)) {
       if (e.l.size() != 1)
@@ -151,8 +145,9 @@ class TyperVisitor implements Visitor {
     } else {
       if (callee == null)
         Typing.error(e.f.loc, "Function is not defined");
-      else if (callee.f.params.size() != e.l.size())
+      else if (callee.params.size() != e.l.size()) {
         Typing.error(e.f.loc, "Bad arity");
+      }
     }
 
     // get actual parameters
@@ -179,7 +174,7 @@ class TyperVisitor implements Visitor {
           break;
       }
     } else {
-      this.tExpr = new TEcall(callee.f, args);
+      this.tExpr = new TEcall(callee, args);
     }
   }
 
@@ -269,12 +264,13 @@ class TyperVisitor implements Visitor {
   }
 
   private Variable getVariable(Ident ident) {
-    LinkedList<TDef> concernedDefs = new LinkedList<TDef>();
-    concernedDefs.add(this.tfile.l.getLast()); // parameters of current TDef (formal parameters)
-    concernedDefs.add(this.tfile.l.getFirst()); // parameters of __main__ (global variables)
+    LinkedList<Function> concernedFunctions = new LinkedList<Function>();
+    concernedFunctions.add(this.currentFunction); // parameters of current function (formal parameters)
+    if (!global_scope)
+      concernedFunctions.add(this.tfile.l.getFirst().f); // parameters of __main__ (global variables)
 
-    for (TDef tDef : concernedDefs) {
-      for (Variable variable : tDef.f.params) {
+    for (Function f : concernedFunctions) {
+      for (Variable variable : f.params) {
         if (variable.name.equals(ident.id))
           return variable;
       }
@@ -284,17 +280,13 @@ class TyperVisitor implements Visitor {
 
   private Variable addVariable(Ident ident) {
     Variable variable = Variable.mkVariable(ident.id);
-    if (ScopeIsGlobal()) {
+    if (this.global_scope) {
       // add to the parameters of __main__ (global variables)
-      this.tfile.l.getLast().f.params.add(variable);
+      currentFunction.params.add(variable);
     } else {
       // add to local variables
       this.localVariables.put(ident.id, variable);
     }
     return variable;
-  }
-
-  private boolean ScopeIsGlobal() {
-    return this.tfile.l.getLast().f.name.equals("__main__");
   }
 }
