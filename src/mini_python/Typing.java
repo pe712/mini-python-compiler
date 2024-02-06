@@ -1,5 +1,6 @@
 package mini_python;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 
@@ -72,12 +73,12 @@ class TyperVisitor implements Visitor {
   public TStmt tStmt;
   public TExpr tExpr;
   private TFile tfile;
-  public HashSet<Variable> localVariables;
+  public HashMap<String, Variable> localVariables;
   private Function len;
 
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
-    this.localVariables = new HashSet<Variable>();
+    this.localVariables = new HashMap<String, Variable>();
     LinkedList<Variable> paramsLen = new LinkedList<Variable>();
     paramsLen.add(Variable.mkVariable("l"));
     len = new Function("len", paramsLen);
@@ -134,9 +135,8 @@ class TyperVisitor implements Visitor {
   @Override
   public void visit(Ecall e) {
     String name = e.f.id;
-    if (Typing.isSpecialCall(name) && e.l.size() != 1)
-      Typing.error(e.f.loc, "Bad arity for len, list, range");
 
+    // resolve to the corresponding TDef if possible
     TDef callee = null;
     for (TDef tdef : this.tfile.l) {
       if (name.equals(tdef.f.name)) {
@@ -145,43 +145,41 @@ class TyperVisitor implements Visitor {
       }
     }
 
-    if (!Typing.isSpecialCall(name)) {
+    if (Typing.isSpecialCall(name)) {
+      if (e.l.size() != 1)
+        Typing.error(e.f.loc, "Bad arity for len, list, range");
+    } else {
       if (callee == null)
         Typing.error(e.f.loc, "Function is not defined");
-      if (callee.f.params.size() != e.l.size())
+      else if (callee.f.params.size() != e.l.size())
         Typing.error(e.f.loc, "Bad arity");
     }
 
+    // get actual parameters
     LinkedList<TExpr> args = new LinkedList<TExpr>();
-
-    if (name.equals("list")) {
-      boolean raiseError = false;
-      raiseError = !(e.l.getLast() instanceof Ecall);
-      Ecall calee = null;
-      if (!raiseError) {
-        calee = (Ecall) e.l.getLast();
-        if (!calee.f.id.equals("range"))
-          raiseError = true;
-      }
-      if (raiseError)
-        Typing.error(e.f.loc,
-            "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
-      calee.accept(this);
-      args.add(this.tExpr);
-      this.tExpr = new TErange(args.getFirst());
-    }
-
     for (Expr expr : e.l) {
       expr.accept(this);
       args.add(this.tExpr);
     }
 
-    if (!Typing.isSpecialCall(name)) 
-      this.tExpr = new TEcall(callee.f, args);
-    else {
-      if (name.equals("len")){
-        this.tExpr = new TEcall(this.len, args);
+    if (Typing.isSpecialCall(name)) {
+      switch (name) {
+        case "list":
+          if (!(args.getFirst() instanceof TErange))
+            Typing.error(e.f.loc,
+                "Built-in functions list and range are exclusively used in the compound expression list(range(e))");
+          else
+            this.tExpr = args.getFirst(); // do nothing but passing the TERange as tExpr
+          break;
+        case "len":
+          this.tExpr = new TEcall(this.len, args);
+          break;
+        case "range":
+          this.tExpr = new TErange(args.getFirst());
+          break;
       }
+    } else {
+      this.tExpr = new TEcall(callee.f, args);
     }
   }
 
@@ -202,7 +200,6 @@ class TyperVisitor implements Visitor {
     }
     this.tExpr = new TElist(elmts);
   }
-
 
   @Override
   public void visit(Sif s) {
@@ -272,10 +269,9 @@ class TyperVisitor implements Visitor {
   }
 
   private Variable getVariable(Ident ident) {
-    // __main__ (global) and current (local)
     LinkedList<TDef> concernedDefs = new LinkedList<TDef>();
-    concernedDefs.add(this.tfile.l.getLast());
-    concernedDefs.add(this.tfile.l.getFirst());
+    concernedDefs.add(this.tfile.l.getLast()); // parameters of current TDef (formal parameters)
+    concernedDefs.add(this.tfile.l.getFirst()); // parameters of __main__ (global variables)
 
     for (TDef tDef : concernedDefs) {
       for (Variable variable : tDef.f.params) {
@@ -283,45 +279,22 @@ class TyperVisitor implements Visitor {
           return variable;
       }
     }
-    for (Variable variable : this.localVariables) {
-      if (variable.name.equals(ident.id))
-        return variable;
-    }
-    // TODO : determine the scope
-    // TODO: go through the scope variable to return
-
-    return null;
+    return this.localVariables.get(ident.id); // local parameters
   }
 
   private Variable addVariable(Ident ident) {
-    // TODO : determine the scope
     Variable variable = Variable.mkVariable(ident.id);
-    // TODO : add to scope
-    if (this.tfile.l.getLast().f.name.equals("__main__")){
+    if (ScopeIsGlobal()) {
+      // add to the parameters of __main__ (global variables)
       this.tfile.l.getLast().f.params.add(variable);
-    }
-    else {
-      this.localVariables.add(variable);
+    } else {
+      // add to local variables
+      this.localVariables.put(ident.id, variable);
     }
     return variable;
   }
 
+  private boolean ScopeIsGlobal() {
+    return this.tfile.l.getLast().f.name.equals("__main__");
+  }
 }
-
-// @Nath I think we should add the three function len, list, range in the
-// tfile.l as if they were classic TDef
-// @PE J'ai hésité à le faire, mais j'ai fait le choix de ne pas le faire pour l'instant
-// car il n'y a pas de statement associé à ces fonctions.
-
-// @Nath I have introduced a global Function main so that every global var is
-// registered at this level. It is also a way to avoid to have a statement out
-// of everything. The main statement is inside main TDef.
-// This means that one cannot define a "main" function...
-// Maybe we should use a reserved word such as __main__ as f.id
-// @PE Tel que tu me l'a passé finalement c'est bien une fonction "__main__"
-
-// @Nath, I don't know where to put Variable that are local but that are not
-// parameters of a Function call
-// I am tempted to modify the Def elmt of the syntax
-// check getVariable
-// @PE J'ai ajouté un HashSet localVariables dans TyperVisitor pour stocker momentanément les variables locales
