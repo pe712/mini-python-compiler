@@ -1,6 +1,7 @@
 package mini_python;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 
 class Typing {
@@ -29,30 +30,25 @@ class Typing {
       if (typerVisitor.functions.containsKey(name))
         error(def.f.loc, "The names of the functions declared with def should be distinct from each other.");
 
-      HashMap<String, Variable> params = new HashMap<String, Variable>();
+      LinkedHashSet<Variable> params = new LinkedHashSet<Variable>();
 
       for (Ident param : def.l) {
         String varName = param.id;
-        if (params.containsKey(varName))
+        Variable variable = Variable.mkVariable(varName);
+        if (params.contains(variable))
           error(def.f.loc, "Formal parameters should be pairwise distincts");
         else
-          params.put(varName, Variable.mkVariable(varName));
+          params.add(variable);
       }
 
-      typerVisitor.functions.put(name, new Function(name, new LinkedList<Variable>(params.values())));
+      typerVisitor.functions.put(name, new Function(name, new LinkedList<Variable>(params)));
     }
 
     // Now we can start running the visitor
-    typerVisitor.visitFunction(main);
-    file.s.accept(typerVisitor);
-    tfile.l.add(new TDef(main, typerVisitor.tStmt));
-    typerVisitor.global_scope = false;
-
+    typerVisitor.visitFunction(main, file.s);
     for (Def def : file.l) {
       Function f = typerVisitor.functions.get(def.f.id);
-      typerVisitor.visitFunction(f);
-      def.s.accept(typerVisitor);
-      tfile.l.add(new TDef(f, typerVisitor.tStmt));
+      typerVisitor.visitFunction(f, def.s);
     }
     return tfile;
   }
@@ -63,12 +59,11 @@ class Typing {
 }
 
 class TyperVisitor implements Visitor {
-  public TStmt tStmt;
-  public TExpr tExpr;
+  private TStmt tStmt;
+  private TExpr tExpr;
   private TFile tfile;
-  public HashMap<String, Variable> localVariables = new HashMap<String, Variable>();
   private Function len;
-  public boolean global_scope = true;
+  private HashMap<String, Variable> currentLocalVariables = new HashMap<String, Variable>();
   public HashMap<String, Function> functions = new HashMap<String, Function>();
   private Function currentFunction;
 
@@ -79,9 +74,11 @@ class TyperVisitor implements Visitor {
     len = new Function("len", paramsLen);
   }
 
-  public void visitFunction(Function f) {
-    this.localVariables.clear();
+  public void visitFunction(Function f, Stmt s) {
+    this.currentLocalVariables = new HashMap<String, Variable>();
     this.currentFunction = f;
+    s.accept(this);
+    this.tfile.l.add(new TDef(f, this.tStmt, this.currentLocalVariables));
   }
 
   @Override
@@ -264,29 +261,30 @@ class TyperVisitor implements Visitor {
   }
 
   private Variable getVariable(Ident ident) {
-    LinkedList<Function> concernedFunctions = new LinkedList<Function>();
-    concernedFunctions.add(this.currentFunction); // parameters of current function (formal parameters)
-    if (!global_scope)
-      concernedFunctions.add(this.tfile.l.getFirst().f); // parameters of __main__ (global variables)
-
-    for (Function f : concernedFunctions) {
-      for (Variable variable : f.params) {
-        if (variable.name.equals(ident.id))
-          return variable;
-      }
+    /*
+     * priority for resolving :
+     * parameters of the current Function
+     * global variables (local of __main__)
+     * local variables of the current Function
+     */
+    for (Variable variable : this.currentFunction.params) {
+      if (variable.name.equals(ident.id))
+        return variable;
     }
-    return this.localVariables.get(ident.id); // local parameters
+    Variable variable = null;
+    if (this.tfile.l.size() > 0){
+      variable = this.tfile.l.getFirst().localVariables.get(ident.id); // __main__ TDef
+    }
+
+    if (variable != null)
+      return variable;
+
+    return this.currentLocalVariables.get(ident.id);
   }
 
   private Variable addVariable(Ident ident) {
     Variable variable = Variable.mkVariable(ident.id);
-    if (this.global_scope) {
-      // add to the parameters of __main__ (global variables)
-      currentFunction.params.add(variable);
-    } else {
-      // add to local variables
-      this.localVariables.put(ident.id, variable);
-    }
+    this.currentLocalVariables.put(ident.id, variable);
     return variable;
   }
 }

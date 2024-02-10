@@ -1,4 +1,5 @@
 package mini_python;
+import java.util.HashMap;
 import java.util.LinkedList;
 
 /* Abstract Syntax of Mini-Python */
@@ -338,6 +339,25 @@ class Variable {
   static Variable mkVariable(String name) {
     return new Variable(name, id++);
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof Variable) {
+      Variable var = (Variable) obj;
+      return this.name.equals(var.name);
+    }
+    return super.equals(obj);
+  }
+
+  @Override
+  public int hashCode() {
+    return this.name.hashCode();
+  }
+
+  @Override
+  public String toString() {
+      return this.name;
+  }
 }
 
 /* Similarly, all the occurrences of a given function all point
@@ -540,11 +560,13 @@ class TSset extends TStmt {
 class TDef {
   final Function f;
   final TStmt body;
+  final public HashMap<String, Variable> localVariables;
 
-  TDef(Function f, TStmt body) {
+  TDef(Function f, TStmt body, HashMap<String, Variable> localVariables) {
     super();
     this.f = f;
     this.body = body;
+    this.localVariables = localVariables;
   }
 }
 
