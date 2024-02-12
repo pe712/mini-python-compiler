@@ -25,7 +25,10 @@ class Compiler implements TVisitor {
   }
 
   public void visit(TDef tDef) {
-    asm.label(tDef.f.name);
+    if (tDef.f.name.equals("__main__"))
+      asm.label("main");
+    else
+      asm.label(tDef.f.name);
     tDef.body.accept(this);
   }
 
@@ -40,7 +43,9 @@ class Compiler implements TVisitor {
   }
 
   public void init() {
-    asm.globl("__main__");
+    asm.globl("main");
+    // TODO check potential collision with func named main
+    // cannot use __main__
     includeMyMalloc();
     asm.dlabel("string_format");
     asm.string("%s");
