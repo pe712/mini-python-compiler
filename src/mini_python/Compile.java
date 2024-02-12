@@ -11,7 +11,6 @@ class Compile {
     for (TDef tDef : file.l) {
       compiler.visit(tDef);
     }
-    compiler.end();
     return asm;
   }
 }
@@ -19,17 +18,13 @@ class Compile {
 class Compiler implements TVisitor {
   private X86_64 asm;
   private String my_malloc = "my_malloc";
-  private boolean global_set = false;
 
   public Compiler(X86_64 asm) {
     this.asm = asm;
+    init();
   }
 
   public void visit(TDef tDef) {
-    if (!global_set) {
-      asm.globl(tDef.f.name);
-      global_set = true;
-    }
     asm.label(tDef.f.name);
     tDef.body.accept(this);
   }
@@ -39,13 +34,16 @@ class Compiler implements TVisitor {
     asm.pushq("%rbp");
     asm.movq("%rsp", "%rbp");
     asm.andq(-16, "%rsp"); // 16-byte stack alignment
-    asm.movq("%rbp", "rsp");
+    asm.movq("%rbp", "%sp");
     asm.popq("%rsp");
     asm.ret();
   }
 
-  public void end() {
+  public void init() {
+    asm.globl("__main__");
     includeMyMalloc();
+    asm.dlabel("string_format");
+    asm.string("%s");
   }
 
   @Override
@@ -216,7 +214,7 @@ class Compiler implements TVisitor {
     s.e.accept(this);
 
     asm.movq("%rax", "%rdi");
-    asm.movq("$%s", "%rax");
+    asm.movq("$string_format", "%rax");
     asm.movq(0, "%rax");
     asm.call("printf");
     // TODO Auto-generated method stub
