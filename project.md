@@ -44,3 +44,10 @@ f-string and .format and %s
 ## data structures
  - dict 
 
+
+useful commands:
+
+make
+gcc -g test.s -o test_exe
+
+bash ./test -v2 ./minipython

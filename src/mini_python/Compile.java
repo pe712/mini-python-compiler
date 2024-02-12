@@ -34,7 +34,7 @@ class Compiler implements TVisitor {
     asm.pushq("%rbp");
     asm.movq("%rsp", "%rbp");
     asm.andq(-16, "%rsp"); // 16-byte stack alignment
-    asm.movq("%rbp", "%sp");
+    asm.movq("%rbp", "%rsp");
     asm.popq("%rsp");
     asm.ret();
   }
