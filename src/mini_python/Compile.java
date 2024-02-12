@@ -17,8 +17,9 @@ class Compile {
 
 class Compiler implements TVisitor {
   private X86_64 asm;
+  private String my_malloc = "my_malloc";
 
-  public Compiler(X86_64 asm){
+  public Compiler(X86_64 asm) {
     this.asm = asm;
   }
 
@@ -48,8 +49,25 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEcst e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TEcst e)'");
+    // TODO
+    // size malloc
+    if (e.c instanceof Cstring){
+      Cstring string = (Cstring) e.c;
+      int size = string.s.length() +2; // length in bytes
+      // put length +2 in correct reg
+    }
+    else 
+    {}
+
+    // regarder comment call malloc
+    asm.call(my_malloc);
+    // from a register (%rax?) take address
+    asm.movq(3, "(%rax)");
+    asm.movq(size, "offset(%rax)");
+    for (int i = 0; i < array.length; i++) {
+      asm.movq(string.s.get(i), "offset(%rax)");
+    }
+    // put pointer in %rax
   }
 
   @Override
@@ -62,6 +80,7 @@ class Compiler implements TVisitor {
         asm.addq("%rbx", "%rax");
         break;
       case Band:
+        // TODO
         break;
       case Bdiv:
         break;
@@ -85,13 +104,19 @@ class Compiler implements TVisitor {
         break;
       case Bsub:
         break;
-      default:
-        break;
     }
   }
 
   @Override
   public void visit(TEunop e) {
+    e.e.accept(this);
+    switch (e.op) {
+      case Uneg:
+        // TODO
+        break;
+      case Unot:
+        break;
+    }
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TEunop e)'");
   }
@@ -104,8 +129,15 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEcall e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TEcall e)'");
+    // load parameters on the stack
+    for (TExpr tExpr : e.l) {
+      tExpr.accept(this);
+      asm.pushq("%rax");
+    }
+    // return address is pushed on the stack by call
+    // asm.pushq("%rbp");
+    asm.call(e.f.name);
+    // TODO : match corresponding label
   }
 
   @Override
@@ -122,6 +154,11 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TErange e) {
+    // save the list on the heap
+    asm.call(my_malloc);
+
+
+    // store address on %rax
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TErange e)'");
   }
