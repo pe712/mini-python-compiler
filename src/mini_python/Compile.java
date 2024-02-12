@@ -215,7 +215,7 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
 
-    asm.leaq("%rax", "%rdi");
+    asm.movq("%rax", "%rdi");
     asm.movq("$%s", "%rax");
     asm.movq(0, "%rax");
     asm.call("printf");

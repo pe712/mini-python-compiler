@@ -1,4 +1,5 @@
 	.text
+__main__:
 	movq $104, %rdi
 	call my_malloc
 	movq $3, (%rax)
@@ -14,10 +15,11 @@
 	movq $114, 72(%rax)
 	movq $108, 80(%rax)
 	movq $100, 88(%rax)
-	leaq %rax, %rdi
+	movq %rax, %rdi
 	movq $%s, %rax
 	movq $0, %rax
 	call printf
+my_malloc:
 	pushq %rbp
 	movq %rsp, %rbp
 	andq $-16, %rsp
@@ -25,5 +27,3 @@
 	popq %rsp
 	ret
 	.data
-__main__:
-my_malloc:
