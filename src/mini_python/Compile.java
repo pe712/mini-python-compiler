@@ -220,7 +220,6 @@ class Compiler implements TVisitor {
     asm.movq(0, "%rax");
     asm.call("printf");
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSprint s)'");
   }
 
   @Override
