@@ -6,7 +6,7 @@ class Compile {
 
   static X86_64 file(TFile file) {
     X86_64 asm = new X86_64();
-    Compiler compiler = new Compiler();
+    Compiler compiler = new Compiler(asm);
 
     for (TDef tDef : file.l) {
       tDef.body.accept(compiler);
@@ -16,6 +16,11 @@ class Compile {
 }
 
 class Compiler implements TVisitor {
+  private X86_64 asm;
+
+  public Compiler(X86_64 asm){
+    this.asm = asm;
+  }
 
   @Override
   public void visit(Cnone c) {
@@ -49,6 +54,18 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
+    // e.e1.accept(this);
+
+    // e.e2.accept(this);
+    // switch (e.op) {
+    //   case Badd:
+        
+    //     break;
+    
+    //   default:
+    //     break;
+    // }
+    // e.op
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }
