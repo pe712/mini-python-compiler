@@ -69,25 +69,36 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEcst e) {
-    // // TODO
-    // // size malloc
-    // if (e.c instanceof Cstring){
-    // Cstring string = (Cstring) e.c;
-    // int size = string.s.length() +2; // length in bytes
-    // // put length +2 in correct reg
-    // }
-    // else
-    // {}
+    // TODO
+    // size malloc
+    int type = 0; // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
+    int size = 0;
+    Cstring string = null;
+    if (e.c instanceof Cstring){
+      type = 3;
+      string = (Cstring) e.c;
+      size = string.s.length() +2; // length in bytes
+      // put length +2 in correct reg
+    }
+    else 
+    {}
 
-    // // regarder comment call malloc
-    // asm.call(my_malloc);
-    // // from a register (%rax?) take address
-    // asm.movq(3, "(%rax)");
-    // asm.movq(size, "offset(%rax)");
-    // for (int i = 0; i < array.length; i++) {
-    // asm.movq(string.s.get(i), "offset(%rax)");
-    // }
-    // // put pointer in %rax
+    // regarder comment call malloc
+    asm.call(my_malloc);
+    // from a register (%rax?) take address
+    switch (type) {
+      case 3:
+        asm.movq(3, "(%rax)");
+        asm.movq(size, "offset(%rax)");
+        for (int i = 0; i < size; i++) {
+          asm.movq(string.s.charAt(i), "offset(%rax)");
+        }
+        break;
+    
+      default:
+        break;
+    }
+    // put pointer in %rax
   }
 
   @Override
