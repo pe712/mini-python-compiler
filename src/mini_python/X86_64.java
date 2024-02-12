@@ -89,6 +89,10 @@ public class X86_64 {
     return emit("addq " + op1 + ", " + op2);
   }
 
+  X86_64 addq(int n, String op) {
+    return subq("$" + n, op);
+  }
+
   X86_64 subq(String op1, String op2) {
     return emit("subq " + op1 + ", " + op2);
   }
