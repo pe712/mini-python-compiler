@@ -54,20 +54,40 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
-    // e.e1.accept(this);
-
-    // e.e2.accept(this);
-    // switch (e.op) {
-    //   case Badd:
-        
-    //     break;
-    
-    //   default:
-    //     break;
-    // }
-    // e.op
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    e.e1.accept(this);
+    asm.movq("%rax", "%rbx");
+    e.e2.accept(this);
+    switch (e.op) {
+      case Badd:
+        asm.addq("%rbx", "%rax");
+        break;
+      case Band:
+        break;
+      case Bdiv:
+        break;
+      case Beq:
+        break;
+      case Bge:
+        break;
+      case Bgt:
+        break;
+      case Ble:
+        break;
+      case Blt:
+        break;
+      case Bmod:
+        break;
+      case Bmul:
+        break;
+      case Bneq:
+        break;
+      case Bor:
+        break;
+      case Bsub:
+        break;
+      default:
+        break;
+    }
   }
 
   @Override
