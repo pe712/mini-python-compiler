@@ -9,8 +9,9 @@ class Compile {
     Compiler compiler = new Compiler(asm);
 
     for (TDef tDef : file.l) {
-      tDef.body.accept(compiler);
+      compiler.visit(tDef);
     }
+    compiler.end();
     return asm;
   }
 }
@@ -21,6 +22,25 @@ class Compiler implements TVisitor {
 
   public Compiler(X86_64 asm) {
     this.asm = asm;
+  }
+
+  public void visit(TDef tDef){
+    asm.dlabel(tDef.f.name);
+    tDef.body.accept(this);
+  }
+
+  private void includeMyMalloc() {
+    asm.dlabel(my_malloc);
+    asm.pushq("%rbp");
+    asm.movq("%rsp", "%rbp");
+    asm.andq(-16, "%rsp"); // 16-byte stack alignment
+    asm.movq("%rbp", "rsp");
+    asm.popq("%rsp");
+    asm.ret();
+  }
+
+  public void end(){
+    includeMyMalloc();
   }
 
   @Override
@@ -49,25 +69,25 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEcst e) {
-    // TODO
-    // size malloc
-    if (e.c instanceof Cstring){
-      Cstring string = (Cstring) e.c;
-      int size = string.s.length() +2; // length in bytes
-      // put length +2 in correct reg
-    }
-    else 
-    {}
+    // // TODO
+    // // size malloc
+    // if (e.c instanceof Cstring){
+    // Cstring string = (Cstring) e.c;
+    // int size = string.s.length() +2; // length in bytes
+    // // put length +2 in correct reg
+    // }
+    // else
+    // {}
 
-    // regarder comment call malloc
-    asm.call(my_malloc);
-    // from a register (%rax?) take address
-    asm.movq(3, "(%rax)");
-    asm.movq(size, "offset(%rax)");
-    for (int i = 0; i < array.length; i++) {
-      asm.movq(string.s.get(i), "offset(%rax)");
-    }
-    // put pointer in %rax
+    // // regarder comment call malloc
+    // asm.call(my_malloc);
+    // // from a register (%rax?) take address
+    // asm.movq(3, "(%rax)");
+    // asm.movq(size, "offset(%rax)");
+    // for (int i = 0; i < array.length; i++) {
+    // asm.movq(string.s.get(i), "offset(%rax)");
+    // }
+    // // put pointer in %rax
   }
 
   @Override
@@ -157,7 +177,6 @@ class Compiler implements TVisitor {
     // save the list on the heap
     asm.call(my_malloc);
 
-
     // store address on %rax
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TErange e)'");
@@ -184,7 +203,7 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSprint s) {
     s.e.accept(this);
-    
+
     asm.leaq("%rax", "%rdi");
     asm.movq("$%s", "%rax");
     asm.movq(0, "%rax");

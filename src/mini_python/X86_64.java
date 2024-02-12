@@ -26,10 +26,10 @@ class Asm extends LabelAsm {
 /** programme assembleur x86-64 */
 public class X86_64 {
   /** segment de code */
-  private LinkedList<LabelAsm>	text;
-  private StringBuffer            inline;
+  private LinkedList<LabelAsm> text;
+  private StringBuffer inline;
   /** segment de données */
-  private StringBuffer			data;
+  private StringBuffer data;
 
   X86_64() {
     this.text = new LinkedList<>();
@@ -119,6 +119,10 @@ public class X86_64 {
 
   X86_64 andq(String op1, String op2) {
     return emit("andq " + op1 + ", " + op2);
+  }
+
+  X86_64 andq(int e, String op) {
+    return emit("andq " + "$" + e + ", " + op);
   }
 
   X86_64 orq(String op1, String op2) {
