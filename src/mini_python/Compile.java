@@ -25,12 +25,12 @@ class Compiler implements TVisitor {
   }
 
   public void visit(TDef tDef){
-    asm.dlabel(tDef.f.name);
+    asm.label(tDef.f.name);
     tDef.body.accept(this);
   }
 
   private void includeMyMalloc() {
-    asm.dlabel(my_malloc);
+    asm.label(my_malloc);
     asm.pushq("%rbp");
     asm.movq("%rsp", "%rbp");
     asm.andq(-16, "%rsp"); // 16-byte stack alignment
