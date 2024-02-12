@@ -146,7 +146,12 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSprint s) {
-
+    s.e.accept(this);
+    
+    asm.leaq("%rax", "%rdi");
+    asm.movq("$%s", "%rax");
+    asm.movq(0, "%rax");
+    asm.call("printf");
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TSprint s)'");
   }
@@ -156,8 +161,7 @@ class Compiler implements TVisitor {
     for (TStmt stmt : s.l) {
       stmt.accept(this);
     }
-    // TODO relire puis enlever l'erreur suivante
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSblock s)'");
+    // TODO relire
   }
 
   @Override
