@@ -77,21 +77,21 @@ class Compiler implements TVisitor {
     if (e.c instanceof Cstring){
       type = 3;
       string = (Cstring) e.c;
-      size = string.s.length() +2; // length in bytes
+      size = string.s.length(); // length in bytes
       // put length +2 in correct reg
     }
     else 
     {}
-
+    asm.movq((size+2) * 8, "%rdi");
     // regarder comment call malloc
     asm.call(my_malloc);
     // from a register (%rax?) take address
     switch (type) {
       case 3:
         asm.movq(3, "(%rax)");
-        asm.movq(size, "offset(%rax)");
+        asm.movq(size, "8(%rax)");
         for (int i = 0; i < size; i++) {
-          asm.movq(string.s.charAt(i), "offset(%rax)");
+          asm.movq(string.s.charAt(i), 8*(i+1) + "(%rax)");
         }
         break;
     
