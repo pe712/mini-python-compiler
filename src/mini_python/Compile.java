@@ -19,12 +19,17 @@ class Compile {
 class Compiler implements TVisitor {
   private X86_64 asm;
   private String my_malloc = "my_malloc";
+  private boolean global_set = false;
 
   public Compiler(X86_64 asm) {
     this.asm = asm;
   }
 
-  public void visit(TDef tDef){
+  public void visit(TDef tDef) {
+    if (!global_set) {
+      asm.globl(tDef.f.name);
+      global_set = true;
+    }
     asm.label(tDef.f.name);
     tDef.body.accept(this);
   }
@@ -39,7 +44,7 @@ class Compiler implements TVisitor {
     asm.ret();
   }
 
-  public void end(){
+  public void end() {
     includeMyMalloc();
   }
 
@@ -74,15 +79,14 @@ class Compiler implements TVisitor {
     int type = 0; // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
     int size = 0;
     Cstring string = null;
-    if (e.c instanceof Cstring){
+    if (e.c instanceof Cstring) {
       type = 3;
       string = (Cstring) e.c;
       size = string.s.length(); // length in bytes
       // put length +2 in correct reg
+    } else {
     }
-    else 
-    {}
-    asm.movq((size+2) * 8, "%rdi");
+    asm.movq((size + 2) * 8, "%rdi");
     // regarder comment call malloc
     asm.call(my_malloc);
     // from a register (%rax?) take address
@@ -91,10 +95,10 @@ class Compiler implements TVisitor {
         asm.movq(3, "(%rax)");
         asm.movq(size, "8(%rax)");
         for (int i = 0; i < size; i++) {
-          asm.movq(string.s.charAt(i), 8*(i+1) + "(%rax)");
+          asm.movq(string.s.charAt(i), 8 * (i + 1) + "(%rax)");
         }
         break;
-    
+
       default:
         break;
     }
