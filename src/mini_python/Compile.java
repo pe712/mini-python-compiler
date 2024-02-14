@@ -11,6 +11,7 @@ class Compile {
     for (TDef tDef : file.l) {
       compiler.visit(tDef);
     }
+    compiler.terminate();
     return asm;
   }
 }
@@ -22,6 +23,11 @@ class Compiler implements TVisitor {
   public Compiler(X86_64 asm) {
     this.asm = asm;
     init();
+  }
+
+  public void terminate() {
+    asm.movq(0, "%rdi");
+    asm.call("exit");
   }
 
   public void visit(TDef tDef) {
@@ -36,9 +42,10 @@ class Compiler implements TVisitor {
     asm.label(my_malloc);
     asm.pushq("%rbp");
     asm.movq("%rsp", "%rbp");
-    asm.andq(-16, "%rsp"); // 16-byte stack alignment
+    asm.addq(-16, "%rsp"); // 16-byte stack alignment
+    asm.call("malloc");
     asm.movq("%rbp", "%rsp");
-    asm.popq("%rsp");
+    asm.popq("%rbp");
     asm.ret();
   }
 
@@ -78,7 +85,6 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TEcst e) {
     // TODO
-    // size malloc
     int type = 0; // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
     int size = 0;
     Cstring string = null;
@@ -86,26 +92,24 @@ class Compiler implements TVisitor {
       type = 3;
       string = (Cstring) e.c;
       size = string.s.length(); // length in bytes
-      // put length +2 in correct reg
     } else {
     }
-    asm.movq((size + 2) * 8, "%rdi");
-    // regarder comment call malloc
+    asm.movq(size + 3, "%rdi");
     asm.call(my_malloc);
-    // from a register (%rax?) take address
+    // address in %rax
     switch (type) {
       case 3:
-        asm.movq(3, "(%rax)");
-        asm.movq(size, "8(%rax)");
+        asm.movq(3, "(%rax)"); // type
+        asm.movq(size+1, "1(%rax)"); //data size
         for (int i = 0; i < size; i++) {
-          asm.movq(string.s.charAt(i), 8 * (i + 1) + "(%rax)");
+          asm.movq(string.s.charAt(i), (i + 1) + "(%rax)"); // character are casted to int = ASCII
         }
+        asm.movq(0, (size+1)+"(%rax)");
         break;
 
       default:
         break;
     }
-    // put pointer in %rax
   }
 
   @Override
@@ -218,11 +222,10 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
 
-    asm.movq("%rax", "%rdi");
-    asm.movq("$string_format", "%rax");
-    asm.movq(0, "%rax");
+    asm.movq("%rax", "%rsi");
+    asm.movq("$string_format", "%rdi");
+    asm.movq(0, "%rax"); // needed to call printf
     asm.call("printf");
-    // TODO Auto-generated method stub
   }
 
   @Override
