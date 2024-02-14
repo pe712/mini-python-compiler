@@ -56,6 +56,8 @@ class Compiler implements TVisitor {
     includeMyMalloc();
     asm.dlabel("string_format");
     asm.string("%s");
+    asm.dlabel("long_format");
+    asm.string("%ld");
   }
 
   // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
@@ -88,8 +90,14 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCint c) {
+    int type = 2;
+    asm.movq(3, "%rdi");
+    asm.call(my_malloc);
+    //adress in %rax
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(c.c.i, "1(%rax)"); // data
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit( Cint c)'");
+    // throw new UnsupportedOperationException("Unimplemented method 'visit( Cint c)'");
   }
 
   @Override
@@ -203,7 +211,10 @@ class Compiler implements TVisitor {
     s.e.accept(this);
 
     asm.movq("%rax", "%rsi");
-    asm.movq("$string_format", "%rdi");
+    if (s.e instanceof TCstring)
+      asm.movq("$string_format", "%rdi");
+    else if (s.e instanceof TCint)
+      asm.movq("$long_format", "%rdi");
     asm.movq(0, "%rax"); // needed to call printf
     asm.call("printf");
   }

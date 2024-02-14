@@ -69,6 +69,10 @@ public class X86_64 {
     return movq("$" + n, op);
   }
 
+  X86_64 movq(long n, String op2) {
+    return movq("$" + n, op2);
+  }
+
   X86_64 movzbq(String op1, String op2) {
     return emit("movzbq " + op1 + ", " + op2);
   }
