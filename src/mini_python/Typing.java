@@ -83,22 +83,22 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Cnone c) {
-    this.tExpr = new TEcst(c);
+    this.tExpr = new TCnone(c);
   }
 
   @Override
   public void visit(Cbool c) {
-    this.tExpr = new TEcst(c);
+    this.tExpr = new TCbool(c);
   }
 
   @Override
   public void visit(Cstring c) {
-    this.tExpr = new TEcst(c);
+    this.tExpr = new TCstring(c);
   }
 
   @Override
   public void visit(Cint c) {
-    this.tExpr = new TEcst(c);
+    this.tExpr = new TCint(c);
   }
 
   @Override

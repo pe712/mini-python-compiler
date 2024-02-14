@@ -58,58 +58,38 @@ class Compiler implements TVisitor {
     asm.string("%s");
   }
 
+  // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
   @Override
-  public void visit(Cnone c) {
+  public void visit(TCnone c) {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(Cnone c)'");
   }
 
   @Override
-  public void visit(Cbool c) {
+  public void visit(TCbool c) {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(Cbool c)'");
   }
 
   @Override
-  public void visit(Cstring c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(Cstring c)'");
-  }
-
-  @Override
-  public void visit(Cint c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit( Cint c)'");
-  }
-
-  @Override
-  public void visit(TEcst e) {
-    // TODO
-    int type = 0; // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
-    int size = 0;
-    Cstring string = null;
-    if (e.c instanceof Cstring) {
-      type = 3;
-      string = (Cstring) e.c;
-      size = string.s.length(); // length in bytes
-    } else {
-    }
+  public void visit(TCstring c) {
+    int type = 3;
+    int size = c.c.s.length(); // length in bytes
     asm.movq(size + 3, "%rdi");
     asm.call(my_malloc);
     // address in %rax
-    switch (type) {
-      case 3:
-        asm.movq(3, "(%rax)"); // type
-        asm.movq(size+1, "1(%rax)"); //data size
-        for (int i = 0; i < size; i++) {
-          asm.movq(string.s.charAt(i), (i + 1) + "(%rax)"); // character are casted to int = ASCII
-        }
-        asm.movq(0, (size+1)+"(%rax)");
-        break;
-
-      default:
-        break;
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(size + 1, "1(%rax)"); // data size
+    for (int i = 0; i < size; i++) {
+      asm.movq(c.c.s.charAt(i), (i + 1) + "(%rax)"); // character are casted to int = ASCII
     }
+    asm.movq(0, (size + 1) + "(%rax)");
+  }
+
+  @Override
+  public void visit(TCint c) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'visit( Cint c)'");
   }
 
   @Override

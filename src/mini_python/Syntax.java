@@ -375,14 +375,55 @@ class Function {
 abstract class TExpr {
   abstract void accept(TVisitor v);
 }
-class TEcst extends TExpr {
-  final Constant c;
-  TEcst(Constant c) {
+
+class TCint extends TExpr {
+ final Cint c;
+
+ TCint(Cint c){
+  super();
+  this.c = c;
+ }
+
+  @Override
+  void accept(TVisitor v) {v.visit(this);}
+}
+
+class TCbool extends TExpr {
+  final Cbool c;
+
+  TCbool(Cbool c){
+    super();
     this.c = c;
   }
+
   @Override
-  void accept(TVisitor v) { v.visit(this); }
+  void accept(TVisitor v) {v.visit(this);}
 }
+
+class TCnone extends TExpr {
+  final Cnone c;
+
+  TCnone(Cnone c){
+    super();
+    this.c = c;
+  }
+
+  @Override
+  void accept(TVisitor v) {v.visit(this);}
+}
+
+class TCstring extends TExpr {
+  final Cstring c;
+
+  TCstring(Cstring c){
+    super();
+    this.c = c;
+  }
+
+  @Override
+  void accept(TVisitor v) {v.visit(this);}
+}
+
 class TEbinop extends TExpr {
   final Binop op;
   final TExpr e1, e2;
@@ -584,11 +625,10 @@ class TFile {
    (feel free to modify it for your needs) */
 
 interface TVisitor {
-  void visit(Cnone c);
-  void visit(Cbool c);
-  void visit(Cstring c);
-  void visit(Cint c);
-  void visit(TEcst e);
+  void visit(TCnone c);
+  void visit(TCbool c);
+  void visit(TCstring c);
+  void visit(TCint c);
   void visit(TEbinop e);
   void visit(TEunop e);
   void visit(TEident e);
