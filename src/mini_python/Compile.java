@@ -55,9 +55,9 @@ class Compiler implements TVisitor {
     // cannot use __main__
     includeMyMalloc();
     asm.dlabel("string_format");
-    asm.string("%s");
+    asm.string("%s\n");
     asm.dlabel("long_format");
-    asm.string("%ld");
+    asm.string("%ld\n");
   }
 
   // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
@@ -69,6 +69,11 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCbool c) {
+    if (c.c.b) {
+      asm.movq(1, "%rax");
+    } else {
+      asm.movq(0, "%rax");
+    }
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(Cbool c)'");
   }
@@ -91,13 +96,13 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TCint c) {
     int type = 2;
-    asm.movq(3, "%rdi");
+    asm.movq(16, "%rdi");
     asm.call(my_malloc);
     //adress in %rax
     asm.movq(type, "(%rax)"); // type
-    asm.movq(c.c.i, "1(%rax)"); // data
-    // TODO Auto-generated method stub
-    // throw new UnsupportedOperationException("Unimplemented method 'visit( Cint c)'");
+    System.out.println(c.c.i);
+    asm.movq(c.c.i, "1(%rax)"); // data 
+    // TODO le movq fonctionne pour les ints mais pas pour les longs 
   }
 
   @Override
@@ -190,6 +195,12 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSif s) {
+    s.e.accept(this);
+    asm.cmpq(0, "%rax");
+    asm.je("else");
+    s.s1.accept(this);
+    asm.jmp("end");
+
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TSif s)'");
   }
@@ -210,11 +221,15 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
 
-    asm.movq("%rax", "%rsi");
-    if (s.e instanceof TCstring)
+    
+    if (s.e instanceof TCstring){
+      asm.movq("%rax", "%rsi");
       asm.movq("$string_format", "%rdi");
-    else if (s.e instanceof TCint)
+    }
+    else if (s.e instanceof TCint){
+      asm.movq("1(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas son adresse
       asm.movq("$long_format", "%rdi");
+    }
     asm.movq(0, "%rax"); // needed to call printf
     asm.call("printf");
   }
