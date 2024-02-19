@@ -58,9 +58,12 @@ class Compiler implements TVisitor {
     asm.string("%s\n");
     asm.dlabel("long_format");
     asm.string("%ld\n");
+    asm.dlabel("true_bool");
+    asm.string("True");
+    asm.dlabel("false_bool");
+    asm.string("False");
   }
 
-  // 0 = null, 1 = bool, 2 = int, 3 = string, 4 = list
   @Override
   public void visit(TCnone c) {
     // TODO Auto-generated method stub
@@ -69,40 +72,41 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCbool c) {
-    if (c.c.b) {
-      asm.movq(1, "%rax");
-    } else {
-      asm.movq(0, "%rax");
-    }
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(Cbool c)'");
+    int type = 1;
+    // type (8) + int (8)
+    asm.movq(16, "%rdi");
+    asm.call(my_malloc);
+    // address in %rax
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(c.c.b ? 1 : 0, "8(%rax)"); // data
   }
 
   @Override
   public void visit(TCstring c) {
-    int type = 3;
-    int size = c.c.s.length(); // length in bytes
-    asm.movq(size + 3, "%rdi");
+    byte type = 3;
+    byte[] string = c.c.s.getBytes();
+    int size = string.length;
+    // type (8) + size (8) + character (1) * size + end zero char (1)
+    asm.movq(size + 17, "%rdi");
     asm.call(my_malloc);
     // address in %rax
     asm.movq(type, "(%rax)"); // type
-    asm.movq(size + 1, "1(%rax)"); // data size
+    asm.movq(size + 1, "8(%rax)"); // data size
     for (int i = 0; i < size; i++) {
-      asm.movq(c.c.s.charAt(i), (i + 1) + "(%rax)"); // character are casted to int = ASCII
+      asm.movb(string[i], (i + 16) + "(%rax)"); // character are casted to int = ASCII
     }
-    asm.movq(0, (size + 1) + "(%rax)");
+    asm.movb((byte) 0, (size + 16) + "(%rax)");
   }
 
   @Override
   public void visit(TCint c) {
     int type = 2;
+    // type (8) + int (8)
     asm.movq(16, "%rdi");
     asm.call(my_malloc);
-    //adress in %rax
+    // address in %rax
     asm.movq(type, "(%rax)"); // type
-    System.out.println(c.c.i);
-    asm.movq(c.c.i, "1(%rax)"); // data 
-    // TODO le movq fonctionne pour les ints mais pas pour les longs 
+    asm.movq(c.c.i, "8(%rax)"); // data
   }
 
   @Override
@@ -221,17 +225,61 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
 
-    
-    if (s.e instanceof TCstring){
-      asm.movq("%rax", "%rsi");
-      asm.movq("$string_format", "%rdi");
-    }
-    else if (s.e instanceof TCint){
-      asm.movq("1(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas son adresse
-      asm.movq("$long_format", "%rdi");
-    }
+    asm.movq("%rax", "%rsi");
+
+    // switch based on (%rax) type
+    // load format in %rdi
+    // & add correct offset to %rsi
+
+    asm.cmpq(0, "(%rax)");
+    // none
+    asm.cmpq(1, "(%rax)");
+    asm.jne("L2");
+    printBool();
+    asm.label("L2");
+    asm.cmpq(2, "(%rax)");
+    asm.jne("L3");
+    printInt();
+    asm.label("L3");
+    asm.cmpq(3, "(%rax)");
+    asm.jne("L4");
+    printString();
+    asm.label("L4");
+    asm.cmpq(4, "(%rax)");
+    asm.jne("L5");
+    printList();
+    asm.label("L5");
+
     asm.movq(0, "%rax"); // needed to call printf
     asm.call("printf");
+  }
+
+  private void printBool() {
+    asm.movq("$string_format", "%rdi");
+
+    asm.movq("8(%rsi)", "%rbx");
+    
+    asm.movq("$true_bool", "%rsi");
+
+    asm.cmpq(1, "%rbx");
+    asm.je("end");
+    asm.movq("$false_bool", "%rsi");
+  
+    asm.label("end");
+  }
+
+  private void printInt() {
+    asm.movq("$long_format", "%rdi");
+    asm.movq("1(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas son adresse
+  }
+
+  private void printList() {
+    // TODO Auto-generated method stub
+  }
+
+  private void printString() {
+    asm.movq("$string_format", "%rdi");
+    asm.addq(16, "%rsi");
   }
 
   @Override
@@ -259,5 +307,4 @@ class Compiler implements TVisitor {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TSset s)'");
   }
-
 }
