@@ -66,7 +66,7 @@ public class X86_64 {
   }
 
   // asm quad = java long
-  // movq should only be called on a long 
+  // movq should only be called on a long
   X86_64 movq(long n, String op) {
     return movq("$" + n, op);
   }
@@ -75,8 +75,12 @@ public class X86_64 {
     return emit("movzbq " + op1 + ", " + op2);
   }
 
+  X86_64 movb(String op1, String op2) {
+    return emit("movb " + op1 + ", " + op2);
+  }
+
   X86_64 movb(byte b, String op2) {
-    return emit("movb $" + b + ", " + op2);
+    return movb("$" + b, op2);
   }
 
   X86_64 incq(String op) {

@@ -68,7 +68,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCstring c) {
-    byte type = 3;
+    int type = 3;
     byte[] string = c.c.s.getBytes();
     int size = string.length;
     // type (8) + size (8) + character (1) * size + end zero char (1)
@@ -76,7 +76,7 @@ class Compiler implements TVisitor {
     asm.call("my_malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
-    asm.movq(size + 1, "8(%rax)"); // data size
+    asm.movq(size, "8(%rax)"); // string size
     for (int i = 0; i < size; i++) {
       asm.movb(string[i], (i + 16) + "(%rax)"); // character are casted to int = ASCII
     }
@@ -96,9 +96,9 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
-    e.e1.accept(this);
-    asm.movq("%rax", "%rbx");
     e.e2.accept(this);
+    asm.movq("%rax", "%rbx");
+    e.e1.accept(this);
     switch (e.op) {
       case Badd:
         asm.call("add");
@@ -296,8 +296,9 @@ class BuiltInFunctions {
 
   /*
    * switch based on (%rax) type
-   * load format in %rdi
-   * add correct offset to %rsi
+   * printf expects format in %rdi
+   * data in %rsi
+   * 0 in %rax
    * 
    */
   private static X86_64 print() {
@@ -305,7 +306,7 @@ class BuiltInFunctions {
     printer.label("print");
     printer.movq("%rax", "%rsi");
     printer.merge(switchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
-    printer.movq(0, "%rax"); // needed to call printf
+    printer.movq(0, "%rax");
     printer.call("printf");
     printer.ret();
     return printer;
@@ -367,11 +368,14 @@ class BuiltInFunctions {
   private static X86_64 add() {
     X86_64 adder = new X86_64();
     adder.label("add");
-    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), new X86_64(), new X86_64()));
+    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
     adder.ret();
     return adder;
   }
 
+  /*
+   * expect pointer to first int in %rbx and unknown pointer in %rax
+   */
   private static X86_64 intAdd() {
     X86_64 intAddition = new X86_64();
     intAddition.movq("8(%rbx)", "%rbx"); // first int in %rbx
@@ -383,8 +387,94 @@ class BuiltInFunctions {
     intAddition.movq(type, "(%rax)");
     intAddition.movq("%rbx", "8(%rax)"); // store result
 
+    X86_64 error = new X86_64();
+    error.movq("$string_format", "%rdi");
+    error.movq("$intAdd_TypeError", "%rsi");
+    error.movq(0, "%rax");
+    error.call("printf");
+    error.movq(1, "%rdi"); // Operation not permitted
+    error.call("exit");
+
     X86_64 intAdder = new X86_64();
-    intAdder.merge(switchType("intAdd", new X86_64(), new X86_64(), intAddition, new X86_64(), new X86_64()));
+    intAdder.dlabel("intAdd_TypeError");
+    intAdder.string("TypeError: unsupported operand type(s) for +: 'int' and not 'int'");
+    // unknown type must be in %rax :
+    intAdder.movq("%rax", "%rsi"); // temporary
+    intAdder.movq("%rbx", "%rax");
+    intAdder.movq("%rsi", "%rbx");
+    intAdder.merge(switchType("intAdd", error, error, intAddition, error, error));
+    return intAdder;
+  }
+
+  /*
+   * expect pointer to first string in %rbx and unknown pointer in %rax
+   */
+  private static X86_64 stringAdd() {
+    X86_64 stringConcatenation = new X86_64();
+    stringConcatenation.movq("%rax", "%r12"); // %rax is not callee saved
+    stringConcatenation.movq("8(%rbx)", "%rbp"); // first string size
+    stringConcatenation.addq("8(%r12)", "%rbp"); // total size
+    stringConcatenation.movq("%rbp", "%rdi");
+    stringConcatenation.addq(17, "%rdi"); // allocation size
+    stringConcatenation.movq("%rdi", "%r13"); // callee saved
+    stringConcatenation.call("my_malloc");
+    // copied from TCstring :
+    int type = 3;
+    stringConcatenation.movq(type, "(%rax)");
+    stringConcatenation.movq("%rbp", "8(%rax)");
+
+    stringConcatenation.addq(15, "%rax");
+    stringConcatenation.movq("%rax", "%r8");
+    stringConcatenation.addq("8(%rbx)", "%r8"); // address where to end copying first string
+    stringConcatenation.addq("%rax", "%rbp"); // address where to end
+
+    stringConcatenation.addq(16, "%rbx");
+    stringConcatenation.addq(16, "%r12");
+
+    stringConcatenation.label("stringConcatenationLoop");
+    stringConcatenation.incq("%rax");
+    
+    stringConcatenation.cmpq("%rax", "%rbp");
+    stringConcatenation.jl("stringConcatenationEndLoop");
+    
+    stringConcatenation.cmpq("%rax", "%r8");
+    stringConcatenation.jl("stringConcatenationSecondString");
+  
+    stringConcatenation.movzbq("(%rbx)", "%rsi"); //temp
+    stringConcatenation.movb("%sil", "(%rax)");
+    stringConcatenation.incq("%rbx");
+    stringConcatenation.jmp("stringConcatenationLoop");
+
+    stringConcatenation.label("stringConcatenationSecondString");
+    stringConcatenation.movzbq("(%r12)", "%rsi"); //temp
+    stringConcatenation.movb("%sil", "(%rax)");
+    stringConcatenation.incq("%r12");
+    stringConcatenation.jmp("stringConcatenationLoop");
+
+    stringConcatenation.label("stringConcatenationEndLoop");
+    stringConcatenation.incq("%rax");
+    stringConcatenation.movb((byte) 0, "(%rax)");
+
+    // reset %rax to its beginning :
+    stringConcatenation.subq("%r13", "%rax");
+
+
+    X86_64 error = new X86_64();
+    error.movq("$string_format", "%rdi");
+    error.movq("$StringAdd_TypeError", "%rsi");
+    error.movq(0, "%rax");
+    error.call("printf");
+    error.movq(1, "%rdi"); // Operation not permitted
+    error.call("exit");
+
+    X86_64 intAdder = new X86_64();
+    intAdder.dlabel("StringAdd_TypeError");
+    intAdder.string("TypeError: unsupported operand type(s) for +: 'str' and not 'str'");
+    // unknown type must be in %rax :
+    intAdder.movq("%rax", "%rsi"); // temporary
+    intAdder.movq("%rbx", "%rax");
+    intAdder.movq("%rsi", "%rbx");
+    intAdder.merge(switchType("stringAdd", error, error, error, stringConcatenation, error));
     return intAdder;
   }
 
