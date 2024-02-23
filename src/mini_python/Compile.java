@@ -101,7 +101,7 @@ class Compiler implements TVisitor {
     e.e2.accept(this);
     switch (e.op) {
       case Badd:
-        asm.addq("%rbx", "%rax");
+        asm.call("add");
         break;
       case Band:
         // TODO
@@ -250,6 +250,7 @@ class BuiltInFunctions {
     LinkedList<X86_64> functions = new LinkedList<X86_64>();
     functions.add(myMalloc());
     functions.add(print());
+    functions.add(add());
     return functions;
   }
 
@@ -266,7 +267,7 @@ class BuiltInFunctions {
     return allignedAlloc;
   }
 
-  private static X86_64 SwitchType(String SwitchName, X86_64 NoneAsm, X86_64 BoolAsm, X86_64 IntAsm, X86_64 StringAsm,
+  private static X86_64 switchType(String SwitchName, X86_64 NoneAsm, X86_64 BoolAsm, X86_64 IntAsm, X86_64 StringAsm,
       X86_64 ListAsm) {
     X86_64 switcher = new X86_64();
     switcher.label(SwitchName);
@@ -303,7 +304,7 @@ class BuiltInFunctions {
     X86_64 printer = new X86_64();
     printer.label("print");
     printer.movq("%rax", "%rsi");
-    printer.merge(SwitchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
+    printer.merge(switchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
     printer.movq(0, "%rax"); // needed to call printf
     printer.call("printf");
     printer.ret();
@@ -357,6 +358,34 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.addq(16, "%rsi");
     return asm;
+  }
+
+  /*
+   * expect the two pointers in %rax and %rbx
+   * result in %rax
+   */
+  private static X86_64 add() {
+    X86_64 adder = new X86_64();
+    adder.label("add");
+    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), new X86_64(), new X86_64()));
+    adder.ret();
+    return adder;
+  }
+
+  private static X86_64 intAdd() {
+    X86_64 intAddition = new X86_64();
+    intAddition.movq("8(%rbx)", "%rbx"); // first int in %rbx
+    intAddition.addq("8(%rax)", "%rbx"); // result in %rbx
+    // copied from TCint :
+    int type = 2;
+    intAddition.movq(16, "%rdi");
+    intAddition.call("my_malloc");
+    intAddition.movq(type, "(%rax)");
+    intAddition.movq("%rbx", "8(%rax)"); // store result
+
+    X86_64 intAdder = new X86_64();
+    intAdder.merge(switchType("intAdd", new X86_64(), new X86_64(), intAddition, new X86_64(), new X86_64()));
+    return intAdder;
   }
 
 }
