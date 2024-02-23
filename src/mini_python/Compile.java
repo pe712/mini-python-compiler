@@ -1,5 +1,7 @@
 package mini_python;
 
+import java.util.LinkedList;
+
 class Compile {
 
   static boolean debug = false;
@@ -18,7 +20,6 @@ class Compile {
 
 class Compiler implements TVisitor {
   private X86_64 asm;
-  private String my_malloc = "my_malloc";
 
   public Compiler(X86_64 asm) {
     this.asm = asm;
@@ -38,30 +39,14 @@ class Compiler implements TVisitor {
     tDef.body.accept(this);
   }
 
-  private void includeMyMalloc() {
-    asm.label(my_malloc);
-    asm.pushq("%rbp");
-    asm.movq("%rsp", "%rbp");
-    asm.addq(-16, "%rsp"); // 16-byte stack alignment
-    asm.call("malloc");
-    asm.movq("%rbp", "%rsp");
-    asm.popq("%rbp");
-    asm.ret();
-  }
-
   public void init() {
     asm.globl("main");
-    // TODO check potential collision with func named main
-    // cannot use __main__
-    includeMyMalloc();
-    asm.dlabel("string_format");
-    asm.string("%s\n");
-    asm.dlabel("long_format");
-    asm.string("%ld\n");
-    asm.dlabel("true_bool");
-    asm.string("True");
-    asm.dlabel("false_bool");
-    asm.string("False");
+    // TODO check potential collision with func named main, and for built-in func
+    // names (my_malloc...)
+    // cannot use __main__ because of x86_64 syntax
+    for (X86_64 func : BuiltInFunctions.getFunctions()) {
+      asm.mergeFirst(func);
+    }
   }
 
   @Override
@@ -75,7 +60,7 @@ class Compiler implements TVisitor {
     int type = 1;
     // type (8) + int (8)
     asm.movq(16, "%rdi");
-    asm.call(my_malloc);
+    asm.call("my_malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     asm.movq(c.c.b ? 1 : 0, "8(%rax)"); // data
@@ -88,7 +73,7 @@ class Compiler implements TVisitor {
     int size = string.length;
     // type (8) + size (8) + character (1) * size + end zero char (1)
     asm.movq(size + 17, "%rdi");
-    asm.call(my_malloc);
+    asm.call("my_malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     asm.movq(size + 1, "8(%rax)"); // data size
@@ -103,7 +88,7 @@ class Compiler implements TVisitor {
     int type = 2;
     // type (8) + int (8)
     asm.movq(16, "%rdi");
-    asm.call(my_malloc);
+    asm.call("my_malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     asm.movq(c.c.i, "8(%rax)"); // data
@@ -225,61 +210,8 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
 
-    asm.movq("%rax", "%rsi");
+    asm.call("print");
 
-    // switch based on (%rax) type
-    // load format in %rdi
-    // & add correct offset to %rsi
-
-    asm.cmpq(0, "(%rax)");
-    // none
-    asm.cmpq(1, "(%rax)");
-    asm.jne("L2");
-    printBool();
-    asm.label("L2");
-    asm.cmpq(2, "(%rax)");
-    asm.jne("L3");
-    printInt();
-    asm.label("L3");
-    asm.cmpq(3, "(%rax)");
-    asm.jne("L4");
-    printString();
-    asm.label("L4");
-    asm.cmpq(4, "(%rax)");
-    asm.jne("L5");
-    printList();
-    asm.label("L5");
-
-    asm.movq(0, "%rax"); // needed to call printf
-    asm.call("printf");
-  }
-
-  private void printBool() {
-    asm.movq("$string_format", "%rdi");
-
-    asm.movq("8(%rsi)", "%rbx");
-    
-    asm.movq("$true_bool", "%rsi");
-
-    asm.cmpq(1, "%rbx");
-    asm.je("end");
-    asm.movq("$false_bool", "%rsi");
-  
-    asm.label("end");
-  }
-
-  private void printInt() {
-    asm.movq("$long_format", "%rdi");
-    asm.movq("1(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas son adresse
-  }
-
-  private void printList() {
-    // TODO Auto-generated method stub
-  }
-
-  private void printString() {
-    asm.movq("$string_format", "%rdi");
-    asm.addq(16, "%rsi");
   }
 
   @Override
@@ -307,4 +239,124 @@ class Compiler implements TVisitor {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TSset s)'");
   }
+
+}
+
+/**
+ * BuiltInFunctions
+ */
+class BuiltInFunctions {
+  public static LinkedList<X86_64> getFunctions() {
+    LinkedList<X86_64> functions = new LinkedList<X86_64>();
+    functions.add(myMalloc());
+    functions.add(print());
+    return functions;
+  }
+
+  private static X86_64 myMalloc() {
+    X86_64 allignedAlloc = new X86_64();
+    allignedAlloc.label("my_malloc");
+    allignedAlloc.pushq("%rbp");
+    allignedAlloc.movq("%rsp", "%rbp");
+    allignedAlloc.addq(-16, "%rsp"); // 16-byte stack alignment
+    allignedAlloc.call("malloc");
+    allignedAlloc.movq("%rbp", "%rsp");
+    allignedAlloc.popq("%rbp");
+    allignedAlloc.ret();
+    return allignedAlloc;
+  }
+
+  private static X86_64 SwitchType(String SwitchName, X86_64 NoneAsm, X86_64 BoolAsm, X86_64 IntAsm, X86_64 StringAsm,
+      X86_64 ListAsm) {
+    X86_64 switcher = new X86_64();
+    switcher.label(SwitchName);
+    switcher.cmpq(0, "(%rax)");
+    switcher.jne(SwitchName + "_L1");
+    switcher.merge(NoneAsm);
+    switcher.label(SwitchName + "_L1");
+    switcher.cmpq(1, "(%rax)");
+    switcher.jne(SwitchName + "_L2");
+    switcher.merge(BoolAsm);
+    switcher.label(SwitchName + "_L2");
+    switcher.cmpq(2, "(%rax)");
+    switcher.jne(SwitchName + "_L3");
+    switcher.merge(IntAsm);
+    switcher.label(SwitchName + "_L3");
+    switcher.cmpq(3, "(%rax)");
+    switcher.jne(SwitchName + "_L4");
+    switcher.merge(StringAsm);
+    switcher.label(SwitchName + "_L4");
+    switcher.cmpq(4, "(%rax)");
+    switcher.jne(SwitchName + "_L5");
+    switcher.merge(ListAsm);
+    switcher.label(SwitchName + "_L5");
+    return switcher;
+  }
+
+  /*
+   * switch based on (%rax) type
+   * load format in %rdi
+   * add correct offset to %rsi
+   * 
+   */
+  private static X86_64 print() {
+    X86_64 printer = new X86_64();
+    printer.label("print");
+    printer.movq("%rax", "%rsi");
+    printer.merge(SwitchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
+    printer.movq(0, "%rax"); // needed to call printf
+    printer.call("printf");
+    printer.ret();
+    return printer;
+  }
+
+  private static X86_64 printNone() {
+    return new X86_64();
+  }
+
+  private static X86_64 printBool() {
+    X86_64 asm = new X86_64();
+    asm.dlabel("true_bool");
+    asm.string("True");
+    asm.dlabel("false_bool");
+    asm.string("False");
+
+    asm.movq("$string_format", "%rdi");
+
+    asm.movq("8(%rsi)", "%rbx");
+
+    asm.movq("$true_bool", "%rsi");
+
+    asm.cmpq(1, "%rbx");
+    asm.je("end_print_bool");
+    asm.movq("$false_bool", "%rsi");
+
+    asm.label("end_print_bool");
+    return asm;
+  }
+
+  private static X86_64 printInt() {
+    X86_64 asm = new X86_64();
+    asm.dlabel("long_format");
+    asm.string("%ld\n");
+    asm.movq("$long_format", "%rdi");
+    asm.movq("8(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas
+                                 // son adresse
+    return asm;
+  }
+
+  private static X86_64 printList() {
+    return new X86_64();
+  }
+
+  private static X86_64 printString() {
+    X86_64 asm = new X86_64();
+    asm.dlabel("string_format");
+    asm.string("%s\n");
+
+    asm.movq("$string_format", "%rdi");
+    asm.addq(16, "%rsi");
+    return asm;
+  }
+
 }

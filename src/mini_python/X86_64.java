@@ -376,6 +376,22 @@ public class X86_64 {
     return emit(".globl " + l);
   }
 
+  void merge(X86_64 asm) {
+    this.text.addAll(asm.text);
+    this.data.append(asm.data);
+    this.inline.append(asm.inline);
+  }
+
+  /*
+   * Merge the other asm code before any main code
+   */
+  void mergeFirst(X86_64 asm) {
+    asm.merge(this);
+    this.text = asm.text;
+    this.data = asm.data;
+    this.inline = asm.inline;
+  }
+
   /** imprime le programme assembleur dans un fichier */
   void printToFile(String file) {
     try {
