@@ -400,7 +400,20 @@ class BuiltInFunctions {
   }
 
   private static X86_64 printNone() {
-    return new X86_64();
+    X86_64 asm = new X86_64();
+    asm.dlabel("none");
+    asm.string("None");
+
+    asm.pushq("%rsi");
+
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$none", "%rsi");
+    asm.movq(0, "%rax");
+    asm.call("printf");
+    asm.popq("%rsi");
+    asm.call("print_newline");
+    asm.ret();
+    return asm;
   }
 
   private static X86_64 printBool() {
@@ -567,7 +580,7 @@ class BuiltInFunctions {
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("intAdd_TypeError");
-    intAdder.string("TypeError: unsupported operand type(s) for +: 'int' and not 'int'");
+    intAdder.string("TypeError: unsupported operand type(s) for +: 'int' and not 'int'\n");
     // unknown type must be in %rax :
     intAdder.movq("%rax", "%rsi"); // temporary
     intAdder.movq("%rbx", "%rax");
@@ -638,7 +651,7 @@ class BuiltInFunctions {
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("StringAdd_TypeError");
-    intAdder.string("TypeError: unsupported operand type(s) for +: 'str' and not 'str'");
+    intAdder.string("TypeError: unsupported operand type(s) for +: 'str' and not 'str'\n");
     // unknown type must be in %rax :
     intAdder.movq("%rax", "%rsi"); // temporary
     intAdder.movq("%rbx", "%rax");
