@@ -1,4 +1,5 @@
-print("kj"+"khkjh")
-# print("d"+18)
-# print(2+18)
-# print([] + 1)
+def a():
+    print(5)
+    return 2
+
+print(a())

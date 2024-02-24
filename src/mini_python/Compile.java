@@ -10,9 +10,14 @@ class Compile {
     X86_64 asm = new X86_64();
     Compiler compiler = new Compiler(asm);
 
+    TDef mainTDef = file.l.poll();
+
     for (TDef tDef : file.l) {
       compiler.visit(tDef);
     }
+    
+    compiler.visit(mainTDef);
+    
     compiler.terminate();
     return asm;
   }
@@ -196,8 +201,8 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSreturn s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSreturn s)'");
+    s.e.accept(this);
+    asm.ret();
   }
 
   @Override
@@ -230,8 +235,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSeval s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSeval s)'");
+    s.e.accept(this);
   }
 
   @Override
@@ -299,7 +303,6 @@ class BuiltInFunctions {
    * printf expects format in %rdi
    * data in %rsi
    * 0 in %rax
-   * 
    */
   private static X86_64 print() {
     X86_64 printer = new X86_64();
