@@ -107,6 +107,10 @@ public class X86_64 {
     return emit("subq " + op1 + ", " + op2);
   }
 
+  X86_64 subq(int n, String op) {
+    return subq("$"+n, op);
+  }
+
   X86_64 imulq(String op1, String op2) {
     return emit("imulq " + op1 + ", " + op2);
   }

@@ -1,5 +1,6 @@
-def a():
-    print(5)
-    return 2
+print(2)
+print(True)
+print(False)
+print("ahh"+"hhhha")
+print([])
 
-print(a())

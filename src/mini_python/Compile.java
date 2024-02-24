@@ -15,9 +15,9 @@ class Compile {
     for (TDef tDef : file.l) {
       compiler.visit(tDef);
     }
-    
+
     compiler.visit(mainTDef);
-    
+
     compiler.terminate();
     return asm;
   }
@@ -177,8 +177,27 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TElist e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit( TElist e)'");
+    int type = 4;
+    int size = e.l.size();
+    // type (8) + size (8) + pointer to value (8) * size
+    int allocSize = size * 8 + 16;
+    asm.movq(allocSize, "%rdi");
+    asm.call("my_malloc");
+    // address in %rax
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(size, "8(%rax)"); // list size
+    asm.addq(16, "%rax"); // first address
+    asm.pushq("%rax");
+
+    for (TExpr elmt : e.l) {
+      elmt.accept(this);
+      asm.popq("%rdi");
+      asm.movq("%rax", "(%rdi)");
+      asm.addq(8, "%rdi");
+      asm.pushq("%rdi");
+    }
+    asm.popq("%rax");
+    asm.subq(allocSize, "%rax");
   }
 
   @Override
@@ -214,9 +233,8 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSprint s) {
     s.e.accept(this);
-
+    asm.movq(0, "%rsi"); // end with a newline
     asm.call("print");
-
   }
 
   @Override
@@ -254,6 +272,7 @@ class BuiltInFunctions {
     LinkedList<X86_64> functions = new LinkedList<X86_64>();
     functions.add(myMalloc());
     functions.add(print());
+    functions.add(printNewline());
     functions.add(add());
     return functions;
   }
@@ -299,6 +318,7 @@ class BuiltInFunctions {
   }
 
   /*
+   * if %rsi is 0x0 then a newline is added
    * switch based on (%rax) type
    * printf expects format in %rdi
    * data in %rsi
@@ -307,12 +327,29 @@ class BuiltInFunctions {
   private static X86_64 print() {
     X86_64 printer = new X86_64();
     printer.label("print");
-    printer.movq("%rax", "%rsi");
     printer.merge(switchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
-    printer.movq(0, "%rax");
-    printer.call("printf");
-    printer.ret();
     return printer;
+  }
+
+  /*
+   * 
+   * if %rsi is 0x0 then prints a newline
+   */
+  private static X86_64 printNewline() {
+    X86_64 newliner = new X86_64();
+    newliner.dlabel("newline");
+    newliner.string("\n");
+
+    newliner.label("print_newline");
+    newliner.cmpq(0, "%rsi");
+    newliner.jne("print_newline_end");
+    newliner.movq("$string_format", "%rdi");
+    newliner.movq("$newline", "%rsi");
+    newliner.movq(0, "%rax");
+    newliner.call("printf");
+    newliner.label("print_newline_end");
+    newliner.ret();
+    return newliner;
   }
 
   private static X86_64 printNone() {
@@ -326,41 +363,124 @@ class BuiltInFunctions {
     asm.dlabel("false_bool");
     asm.string("False");
 
+    asm.pushq("%rsi");
+
     asm.movq("$string_format", "%rdi");
-
-    asm.movq("8(%rsi)", "%rbx");
-
     asm.movq("$true_bool", "%rsi");
 
+    asm.movq("8(%rax)", "%rbx");
     asm.cmpq(1, "%rbx");
     asm.je("end_print_bool");
+
     asm.movq("$false_bool", "%rsi");
 
     asm.label("end_print_bool");
+
+    asm.movq(0, "%rax");
+    asm.call("printf");
+
+    asm.popq("%rsi");
+    asm.call("print_newline");
+
+    asm.ret();
     return asm;
   }
 
   private static X86_64 printInt() {
     X86_64 asm = new X86_64();
     asm.dlabel("long_format");
-    asm.string("%ld\n");
+    asm.string("%ld");
+    asm.pushq("%rsi");
     asm.movq("$long_format", "%rdi");
     asm.movq("8(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas
                                  // son adresse
+    asm.movq(0, "%rax");
+    asm.call("printf");
+    asm.popq("%rsi");
+    asm.call("print_newline");
+    asm.ret();
     return asm;
   }
 
   private static X86_64 printList() {
-    return new X86_64();
+    X86_64 asm = new X86_64();
+    asm.dlabel("left_bracket");
+    asm.string("[");
+    asm.dlabel("right_bracket");
+    asm.string("]");
+    asm.dlabel("comma");
+    asm.string(", ");
+
+    asm.pushq("%rsi");
+    asm.movq("%rax", "%r8");
+    asm.addq(16, "%r8"); // address of the first elmt pointer
+    asm.movq("8(%rax)", "%r9"); // size in elements
+    asm.shlq("$3", "%r9"); // size in bytes
+    asm.addq("%r8", "%r9"); // address of the last elmt pointer
+    asm.pushq("%r9");
+    asm.pushq("%r8");
+
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$left_bracket", "%rsi");
+    asm.movq(0, "%rax");
+    asm.call("printf");
+
+    asm.movq(0, "%r10"); // first iteration
+    asm.label("printList_loop");
+    asm.popq("%r8");
+    asm.popq("%r9");
+    asm.cmpq("%r8", "%r9");
+    asm.jle("printList_end_loop");
+
+    asm.pushq("%r9");
+    asm.pushq("%r8");
+
+    asm.cmpq(0, "%r10");
+    asm.je("printList_first_elmt");
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$comma", "%rsi");
+    asm.movq(0, "%rax");
+    asm.call("printf");
+    asm.jmp("printList_every_elmt");
+
+    asm.label("printList_first_elmt");
+    asm.notq("%r10");
+
+    asm.label("printList_every_elmt");
+    asm.popq("%r8");
+    asm.movq("(%r8)", "%rax");
+    asm.addq(8, "%r8");
+    asm.pushq("%r8");
+    asm.movq(1, "%rsi"); // no endline
+    asm.call("print");
+    asm.jmp("printList_loop");
+
+    asm.label("printList_end_loop");
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$right_bracket", "%rsi");
+    asm.movq(0, "%rax");
+    asm.call("printf");
+    asm.popq("%rsi");
+    asm.call("print_newline");
+    asm.ret();
+    return asm;
+
   }
 
   private static X86_64 printString() {
     X86_64 asm = new X86_64();
     asm.dlabel("string_format");
-    asm.string("%s\n");
+    asm.string("%s");
 
+    asm.pushq("%rsi");
     asm.movq("$string_format", "%rdi");
+    asm.movq("%rax", "%rsi");
     asm.addq(16, "%rsi");
+    asm.movq(0, "%rax");
+    asm.call("printf");
+    asm.popq("%rsi");
+    asm.call("print_newline");
+    asm.ret();
     return asm;
   }
 
@@ -415,52 +535,51 @@ class BuiltInFunctions {
   private static X86_64 stringAdd() {
     X86_64 stringConcatenation = new X86_64();
     stringConcatenation.movq("%rax", "%r12"); // %rax is not callee saved
-    stringConcatenation.movq("8(%rbx)", "%rbp"); // first string size
-    stringConcatenation.addq("8(%r12)", "%rbp"); // total size
-    stringConcatenation.movq("%rbp", "%rdi");
+    stringConcatenation.movq("8(%rbx)", "%r14"); // first string size
+    stringConcatenation.addq("8(%r12)", "%r14"); // total size
+    stringConcatenation.movq("%r14", "%rdi");
     stringConcatenation.addq(17, "%rdi"); // allocation size
     stringConcatenation.movq("%rdi", "%r13"); // callee saved
     stringConcatenation.call("my_malloc");
     // copied from TCstring :
     int type = 3;
     stringConcatenation.movq(type, "(%rax)");
-    stringConcatenation.movq("%rbp", "8(%rax)");
+    stringConcatenation.movq("%r14", "8(%rax)");
 
     stringConcatenation.addq(15, "%rax");
     stringConcatenation.movq("%rax", "%r8");
     stringConcatenation.addq("8(%rbx)", "%r8"); // address where to end copying first string
-    stringConcatenation.addq("%rax", "%rbp"); // address where to end
+    stringConcatenation.addq("%rax", "%r14"); // address where to end
 
     stringConcatenation.addq(16, "%rbx");
     stringConcatenation.addq(16, "%r12");
 
-    stringConcatenation.label("stringConcatenationLoop");
+    stringConcatenation.label("stringConcatenation_loop");
     stringConcatenation.incq("%rax");
-    
-    stringConcatenation.cmpq("%rax", "%rbp");
-    stringConcatenation.jl("stringConcatenationEndLoop");
-    
+
+    stringConcatenation.cmpq("%rax", "%r14");
+    stringConcatenation.jl("stringConcatenation_end_loop");
+
     stringConcatenation.cmpq("%rax", "%r8");
-    stringConcatenation.jl("stringConcatenationSecondString");
-  
-    stringConcatenation.movzbq("(%rbx)", "%rsi"); //temp
+    stringConcatenation.jl("stringConcatenation_second_string");
+
+    stringConcatenation.movzbq("(%rbx)", "%rsi"); // temp
     stringConcatenation.movb("%sil", "(%rax)");
     stringConcatenation.incq("%rbx");
-    stringConcatenation.jmp("stringConcatenationLoop");
+    stringConcatenation.jmp("stringConcatenation_loop");
 
-    stringConcatenation.label("stringConcatenationSecondString");
-    stringConcatenation.movzbq("(%r12)", "%rsi"); //temp
+    stringConcatenation.label("stringConcatenation_second_string");
+    stringConcatenation.movzbq("(%r12)", "%rsi"); // temp
     stringConcatenation.movb("%sil", "(%rax)");
     stringConcatenation.incq("%r12");
-    stringConcatenation.jmp("stringConcatenationLoop");
+    stringConcatenation.jmp("stringConcatenation_loop");
 
-    stringConcatenation.label("stringConcatenationEndLoop");
+    stringConcatenation.label("stringConcatenation_end_loop");
     stringConcatenation.incq("%rax");
     stringConcatenation.movb((byte) 0, "(%rax)");
 
     // reset %rax to its beginning :
     stringConcatenation.subq("%r13", "%rax");
-
 
     X86_64 error = new X86_64();
     error.movq("$string_format", "%rdi");
