@@ -593,6 +593,7 @@ class BuiltInFunctions {
    * expect pointer to first string in %rbx and unknown pointer in %rax
    */
   private static X86_64 stringAdd() {
+    // All of this could have been done with strcat !!
     X86_64 stringConcatenation = new X86_64();
     stringConcatenation.movq("%rax", "%r12"); // %rax is not callee saved
     stringConcatenation.movq("8(%rbx)", "%r14"); // first string size
