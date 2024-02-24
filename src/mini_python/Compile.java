@@ -57,8 +57,12 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCnone c) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(Cnone c)'");
+    int type = 0;
+    // type (8) + int (8)
+    asm.movq(16, "%rdi");
+    asm.call("my_malloc");
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(0, "8(%rax)");
   }
 
   @Override
