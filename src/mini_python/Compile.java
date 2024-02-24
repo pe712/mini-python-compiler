@@ -49,6 +49,7 @@ class Compiler implements TVisitor {
     // TODO check potential collision with func named main, and for built-in func
     // names (my_malloc...)
     // cannot use __main__ because of x86_64 syntax
+    // maybe end every label with __ to make the difference
     for (X86_64 func : BuiltInFunctions.getFunctions()) {
       asm.mergeFirst(func);
     }
@@ -242,7 +243,6 @@ class Compiler implements TVisitor {
     for (TStmt stmt : s.l) {
       stmt.accept(this);
     }
-    // TODO relire
   }
 
   @Override
@@ -258,8 +258,18 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSset s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSset s)'");
+    s.e1.accept(this);
+    asm.label("e1");
+    asm.pushq("%rax");
+    s.e2.accept(this);
+    asm.label("e2");
+    asm.pushq("%rax");
+    s.e3.accept(this);
+    asm.label("e3");
+    asm.movq("%rax", "%rdx");
+    asm.popq("%rsi");
+    asm.popq("%rdi");
+    asm.call("set");
   }
 
 }
@@ -274,7 +284,40 @@ class BuiltInFunctions {
     functions.add(print());
     functions.add(printNewline());
     functions.add(add());
+    functions.add(set());
     return functions;
+  }
+
+  /*
+   * expects %rdi, %rsi and %rdx such that rdi[rsi] = rdx
+   */
+  private static X86_64 set() {
+    X86_64 error = new X86_64();
+    error.movq("$string_format", "%rdi");
+    error.movq("$TSset_TypeError_index", "%rsi");
+    error.movq(0, "%rax");
+    error.call("printf");
+    error.movq(1, "%rdi"); // Operation not permitted
+    error.call("exit");
+
+    X86_64 effectiveSetter = new X86_64();
+    // rdi = list pointer
+    // %rax = index (int)
+    // %rdx = value adress
+    effectiveSetter.addq(16, "%rdi"); // first elmt
+    effectiveSetter.movq("8(%rax)", "%rax"); // offset
+    effectiveSetter.addq("%rax", "%rdi"); // address to set
+    effectiveSetter.movq("%rdx", "(%rdi)"); // store the value
+    effectiveSetter.ret();
+
+    X86_64 setter = new X86_64();
+    setter.dlabel("TSset_TypeError_index");
+    setter.string("TypeError: list indices must be integers\n");
+    setter.label("set");
+    setter.movq("%rsi", "%rax"); // for switch on type of index
+    setter.merge(switchType("TSset", error, error, effectiveSetter, error, error));
+    return setter;
+    // TODO: out of range error
   }
 
   private static X86_64 myMalloc() {
