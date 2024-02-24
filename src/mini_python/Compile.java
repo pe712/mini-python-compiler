@@ -67,12 +67,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCbool c) {
-    int type = 1;
-    // type (8) + int (8)
-    asm.movq(16, "%rdi");
-    asm.call("my_malloc");
-    // address in %rax
-    asm.movq(type, "(%rax)"); // type
+    asm.merge(BuiltInFunctions.allocateTCbool());
     asm.movq(c.c.b ? 1 : 0, "8(%rax)"); // data
   }
 
@@ -213,14 +208,16 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSif s) {
+    int uniqueTsifId =  s.hashCode();
     s.e.accept(this);
-    asm.cmpq(0, "%rax");
-    asm.je("else");
+    asm.call("bool");
+    asm.cmpq(0, "8(%rax)");
+    asm.je("else_" + uniqueTsifId);
     s.s1.accept(this);
     asm.jmp("end");
-
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSif s)'");
+    asm.label("else_" + uniqueTsifId);
+    s.s2.accept(this);
+    asm.label("end_" + uniqueTsifId);
   }
 
   @Override
@@ -289,7 +286,39 @@ class BuiltInFunctions {
     functions.add(printNewline());
     functions.add(add());
     functions.add(set());
+    functions.add(bool());
     return functions;
+  }
+
+  /*
+   * converts to bool the value pointed by %rax
+   */
+  private static X86_64 bool() {
+    X86_64 toBool = new X86_64();
+    toBool.label("bool");
+    toBool.pushq("%rax");
+    toBool.merge(allocateTCbool());
+    toBool.popq("%rsi"); // pointer to the value
+    toBool.cmpq(0, "8(%rsi)"); // size of the string/list/value of int/value of bool/0 for None
+    toBool.je("bool_false");
+    toBool.movq(1, "8(%rax)");
+    toBool.jmp("bool_end");
+    toBool.label("bool_false");
+    toBool.movq(0, "8(%rax)");
+    toBool.label("bool_end");
+    toBool.ret();
+    return toBool;
+  }
+
+  public static X86_64 allocateTCbool() {
+    X86_64 asm = new X86_64();
+    int type = 1;
+    // type (8) + int (8)
+    asm.movq(16, "%rdi");
+    asm.call("my_malloc");
+    // address in %rax
+    asm.movq(type, "(%rax)"); // type
+    return asm;
   }
 
   /*
@@ -319,7 +348,7 @@ class BuiltInFunctions {
     setter.string("TypeError: list indices must be integers\n");
     setter.label("set");
     setter.movq("%rsi", "%rax"); // for switch on type of index
-    setter.merge(switchType("TSset", error, error, effectiveSetter, error, error));
+    setter.merge(switchType("set", error, error, effectiveSetter, error, error));
     return setter;
     // TODO: out of range error
   }
@@ -340,7 +369,6 @@ class BuiltInFunctions {
   private static X86_64 switchType(String SwitchName, X86_64 NoneAsm, X86_64 BoolAsm, X86_64 IntAsm, X86_64 StringAsm,
       X86_64 ListAsm) {
     X86_64 switcher = new X86_64();
-    switcher.label(SwitchName);
     switcher.cmpq(0, "(%rax)");
     switcher.jne(SwitchName + "_L1");
     switcher.merge(NoneAsm);
@@ -374,7 +402,7 @@ class BuiltInFunctions {
   private static X86_64 print() {
     X86_64 printer = new X86_64();
     printer.label("print");
-    printer.merge(switchType("TSprint", printNone(), printBool(), printInt(), printString(), printList()));
+    printer.merge(switchType("print", printNone(), printBool(), printInt(), printString(), printList()));
     return printer;
   }
 
@@ -551,7 +579,7 @@ class BuiltInFunctions {
   private static X86_64 add() {
     X86_64 adder = new X86_64();
     adder.label("add");
-    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
+    adder.merge(switchType("add", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
     adder.ret();
     return adder;
   }

@@ -204,10 +204,11 @@ class TyperVisitor implements Visitor {
   @Override
   public void visit(Sif s) {
     s.e.accept(this);
+    TExpr tExprSave = this.tExpr;
     s.s1.accept(this);
     TStmt tStmtSave = this.tStmt;
     s.s2.accept(this);
-    this.tStmt = new TSif(this.tExpr, tStmtSave, this.tStmt);
+    this.tStmt = new TSif(tExprSave, tStmtSave, this.tStmt);
   }
 
   @Override
