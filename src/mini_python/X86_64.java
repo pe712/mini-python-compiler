@@ -179,6 +179,14 @@ public class X86_64 {
     return emit("call " + s);
   }
 
+  X86_64 framecall(String s) {
+    emit("pushq %rbp");
+    emit("movq %rsp, %rbp");
+    emit("call " + s);
+    emit("movq %rbp, %rsp");
+    return emit("popq %rbp");
+  }
+
   X86_64 callstar(String op) {
     return emit("call *" + op);
   }

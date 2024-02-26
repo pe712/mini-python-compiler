@@ -34,7 +34,7 @@ class Compiler implements TVisitor {
 
   public void terminate() {
     asm.movq(0, "%rdi");
-    asm.call("exit");
+    asm.framecall("exit");
   }
 
   public void visit(TDef tDef) {
@@ -114,7 +114,7 @@ class Compiler implements TVisitor {
     e.e1.accept(this);
     switch (e.op) {
       case Badd:
-        asm.call("add");
+        asm.framecall("add");
         break;
       case Band:
         // TODO
@@ -172,11 +172,10 @@ class Compiler implements TVisitor {
       // TODO: make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
-    asm.pushq("%rbp");
-    asm.movq("%rsp", "%rbp");
-    asm.call(e.f.name);
-    asm.movq("%rbp", "%rsp");
-    asm.popq("%rbp");
+    // return address is pushed on the stack by call
+    // asm.pushq("%rbp");
+    asm.framecall(e.f.name);
+    // TODO : match corresponding label
   }
 
   @Override
@@ -220,11 +219,11 @@ class Compiler implements TVisitor {
   public void visit(TSif s) {
     int uniqueTsifId = s.hashCode();
     s.e.accept(this);
-    asm.call("bool");
+    asm.framecall("bool");
     asm.cmpq(0, "8(%rax)");
     asm.je("else_" + uniqueTsifId);
     s.s1.accept(this);
-    asm.jmp("end");
+    asm.jmp("end_"+uniqueTsifId);
     asm.label("else_" + uniqueTsifId);
     s.s2.accept(this);
     asm.label("end_" + uniqueTsifId);
@@ -246,7 +245,7 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
     asm.movq(0, "%rsi"); // end with a newline
-    asm.call("print");
+    asm.framecall("print");
   }
 
   @Override
@@ -280,7 +279,7 @@ class Compiler implements TVisitor {
     asm.movq("%rax", "%rdx");
     asm.popq("%rsi");
     asm.popq("%rdi");
-    asm.call("set");
+    asm.framecall("set");
   }
 
 }
@@ -339,9 +338,9 @@ class BuiltInFunctions {
     error.movq("$string_format", "%rdi");
     error.movq("$TSset_TypeError_index", "%rsi");
     error.movq(0, "%rax");
-    error.call("printf");
+    error.framecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.call("exit");
+    error.framecall("exit");
 
     X86_64 effectiveSetter = new X86_64();
     // rdi = list pointer
@@ -431,7 +430,7 @@ class BuiltInFunctions {
     newliner.movq("$string_format", "%rdi");
     newliner.movq("$newline", "%rsi");
     newliner.movq(0, "%rax");
-    newliner.call("printf");
+    newliner.framecall("printf");
     newliner.label("print_newline_end");
     newliner.ret();
     return newliner;
@@ -447,9 +446,9 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$none", "%rsi");
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
     asm.popq("%rsi");
-    asm.call("print_newline");
+    asm.framecall("print_newline");
     asm.ret();
     return asm;
   }
@@ -475,10 +474,10 @@ class BuiltInFunctions {
     asm.label("end_print_bool");
 
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
 
     asm.popq("%rsi");
-    asm.call("print_newline");
+    asm.framecall("print_newline");
 
     asm.ret();
     return asm;
@@ -493,9 +492,9 @@ class BuiltInFunctions {
     asm.movq("8(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas
                                  // son adresse
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
     asm.popq("%rsi");
-    asm.call("print_newline");
+    asm.framecall("print_newline");
     asm.ret();
     return asm;
   }
@@ -521,7 +520,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$left_bracket", "%rsi");
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
 
     asm.movq(0, "%r10"); // first iteration
     asm.label("printList_loop");
@@ -538,7 +537,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$comma", "%rsi");
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
     asm.jmp("printList_every_elmt");
 
     asm.label("printList_first_elmt");
@@ -550,16 +549,16 @@ class BuiltInFunctions {
     asm.addq(8, "%r8");
     asm.pushq("%r8");
     asm.movq(1, "%rsi"); // no endline
-    asm.call("print");
+    asm.framecall("print");
     asm.jmp("printList_loop");
 
     asm.label("printList_end_loop");
     asm.movq("$string_format", "%rdi");
     asm.movq("$right_bracket", "%rsi");
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
     asm.popq("%rsi");
-    asm.call("print_newline");
+    asm.framecall("print_newline");
     asm.ret();
     return asm;
 
@@ -575,9 +574,9 @@ class BuiltInFunctions {
     asm.movq("%rax", "%rsi");
     asm.addq(16, "%rsi");
     asm.movq(0, "%rax");
-    asm.call("printf");
+    asm.framecall("printf");
     asm.popq("%rsi");
-    asm.call("print_newline");
+    asm.framecall("print_newline");
     asm.ret();
     return asm;
   }
@@ -612,9 +611,9 @@ class BuiltInFunctions {
     error.movq("$string_format", "%rdi");
     error.movq("$intAdd_TypeError", "%rsi");
     error.movq(0, "%rax");
-    error.call("printf");
+    error.framecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.call("exit");
+    error.framecall("exit");
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("intAdd_TypeError");
@@ -684,9 +683,9 @@ class BuiltInFunctions {
     error.movq("$string_format", "%rdi");
     error.movq("$StringAdd_TypeError", "%rsi");
     error.movq(0, "%rax");
-    error.call("printf");
+    error.framecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.call("exit");
+    error.framecall("exit");
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("StringAdd_TypeError");
