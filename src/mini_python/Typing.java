@@ -78,13 +78,11 @@ class TyperVisitor implements Visitor {
     this.currentLocalVariables = new HashMap<String, Variable>();
     this.currentFunction = f;
     s.accept(this);
-    if (this.tStmt instanceof TSblock){
+    // add a return None if nothing is present:
+    if (!f.name.equals("__main__") && this.tStmt instanceof TSblock) {
       TSblock block = (TSblock) this.tStmt;
       if (!(block.l.getLast() instanceof TSreturn))
         block.l.add(new TSreturn(new TCnone(new Cnone())));
-    }
-    else{
-      System.out.println("'visitFunction' expects a Sblock as body");
     }
     this.tfile.l.add(new TDef(f, this.tStmt, this.currentLocalVariables));
   }
@@ -281,7 +279,7 @@ class TyperVisitor implements Visitor {
         return variable;
     }
     Variable variable = null;
-    if (this.tfile.l.size() > 0){
+    if (this.tfile.l.size() > 0) {
       variable = this.tfile.l.getFirst().localVariables.get(ident.id); // __main__ TDef
     }
 

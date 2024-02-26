@@ -1,5 +1,6 @@
 package mini_python;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 
 class Compile {
@@ -37,10 +38,17 @@ class Compiler implements TVisitor {
   }
 
   public void visit(TDef tDef) {
-    if (tDef.f.name.equals("__main__"))
+    if (tDef.f.name.equals("__main__")) {
       asm.label("main");
-    else
+      asm.movq("%rsp", "%rbp");
+    } else
       asm.label(tDef.f.name);
+    // allocate localVariables on the stack TODO :
+    // asm.xorq("%rax", "%rax");
+    asm.movq(55, "%rax");
+    for (Variable variable : tDef.localVariables.values()) {
+      asm.pushq("%rax");
+    }
     tDef.body.accept(this);
   }
 
@@ -152,21 +160,23 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEident e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TEident e)'");
+    asm.movq(e.x.ofs + "(%rbp)", "%rax");
   }
 
   @Override
   public void visit(TEcall e) {
     // load parameters on the stack
-    for (TExpr tExpr : e.l) {
-      tExpr.accept(this);
+    Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
+    while (backArgsIterator.hasNext()) {
+      backArgsIterator.next().accept(this);
+      // TODO: make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
-    // return address is pushed on the stack by call
-    // asm.pushq("%rbp");
+    asm.pushq("%rbp");
+    asm.movq("%rsp", "%rbp");
     asm.call(e.f.name);
-    // TODO : match corresponding label
+    asm.movq("%rbp", "%rsp");
+    asm.popq("%rbp");
   }
 
   @Override
@@ -208,7 +218,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSif s) {
-    int uniqueTsifId =  s.hashCode();
+    int uniqueTsifId = s.hashCode();
     s.e.accept(this);
     asm.call("bool");
     asm.cmpq(0, "8(%rax)");
@@ -228,8 +238,8 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSassign s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSassign s)'");
+    s.e.accept(this);
+    asm.movq("%rax", s.x.ofs + "(%rbp)");
   }
 
   @Override

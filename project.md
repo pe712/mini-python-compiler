@@ -30,6 +30,17 @@ Very simple but very effective
     a = [2*x for x in a]
     a = [x for x in a if x>0]
 
+
+04 size first_elmt_pointer
+
+value_pointer next_pointer
+
+value_pointer next_pointer
+
+next_pointer null
+
+
+
 ## classes
 Lot of work but probably interesting
 
@@ -39,7 +50,10 @@ f-string and .format and %s
 ## functions
  - Built-in Memoization: Provide a built-in mechanism for memoization to optimize function calls by caching results for known input arguments.
  - overloading based on the number of args/dynamic type
- - optional arguments (args and kwargs)
+ - optional arguments
+
+
+
 
 ## data structures
  - dict 
@@ -51,3 +65,6 @@ make
 gcc -g test.s -o test_exe
 
 bash ./test -v2 ./minipython
+
+
+global variables need to be passed to every sub stack frame
