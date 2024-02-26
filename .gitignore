@@ -1,6 +1,10 @@
 save
 bin
+minipython
 questions.md
 .vscode
 test.s
 test_exe
+out
+exec/*.s
+exec-fail/*.s
