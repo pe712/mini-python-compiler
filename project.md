@@ -67,4 +67,4 @@ gcc -g test.s -o test_exe
 bash ./test -v2 ./minipython
 
 
-global variables need to be passed to every sub stack frame
+TODO : global variables need to be passed to every sub stack frame
