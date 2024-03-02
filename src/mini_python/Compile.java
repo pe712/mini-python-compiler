@@ -109,47 +109,89 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
-    e.e2.accept(this);
-    asm.movq("%rax", "%rbx");
-    e.e1.accept(this);
-    switch (e.op) {
-      case Badd:
-        asm.framecall("add");
-        break;
+    switch (e.op) { // besoin de faire un premier cas particulier pour respecter la "flemme" des opérateurs or et and
       case Band:
-        asm.framecall("Band");
-        // TODO
-        break;
-      case Bdiv:
-        asm.framecall("div");
-        break;
-      case Beq:
-        asm.framecall("Beq");
-        break;
-      case Bge:
-        asm.framecall("Bge");
-        break;
-      case Bgt:
-        asm.framecall("Bgt");
-        break;
-      case Ble:
-        asm.framecall("Ble");
-        break;
-      case Blt:
-        asm.framecall("Blt");
-        break;
-      case Bmod:
-        asm.framecall("mod");
-        break;
-      case Bmul:
-        asm.framecall("mul");
-        break;
-      case Bneq:
+        e.e1.accept(this);
+        asm.framecall("bool");
+        asm.cmpq(0,"8(%rax)");
+        asm.je("Band_false_" + e.hashCode());
+        e.e2.accept(this);
+        asm.framecall("bool");
+        asm.cmpq(0,"8(%rax)");
+        asm.je("Band_false_" + e.hashCode());
+        asm.movq(1, "%r8");
+        asm.jmp("Band_end_" + e.hashCode());
+        asm.label("Band_false_" + e.hashCode());
+        asm.movq(0, "%r8");
+        asm.label("Band_end_" + e.hashCode());
+        // mise en mémoire du résultat
+        asm.pushq("%r8");
+        asm.movq(16, "%rdi");
+        asm.call("my_malloc");
+        asm.movq(1, "(%rax)");
+        asm.popq("%r8");
+        asm.movq("%r8", "8(%rax)");
         break;
       case Bor:
+        e.e1.accept(this);
+        asm.framecall("bool");
+        asm.cmpq(1,"8(%rax)");
+        asm.je("Bor_true_" + e.hashCode());
+        e.e2.accept(this);
+        asm.framecall("bool");
+        asm.cmpq(1,"8(%rax)");
+        asm.je("Bor_true_" + e.hashCode());
+        asm.movq(0, "%r8");
+        asm.jmp("Bor_end_" + e.hashCode());
+        asm.label("Bor_true_" + e.hashCode());
+        asm.movq(1, "%r8");
+        asm.label("Bor_end_" + e.hashCode());
+        // mise en mémoire du résultat
+        asm.pushq("%r8");
+        asm.movq(16, "%rdi");
+        asm.call("my_malloc");
+        asm.movq(1, "(%rax)");
+        asm.popq("%r8");
+        asm.movq("%r8", "8(%rax)");
         break;
-      case Bsub:
-        break;
+      default:
+      e.e2.accept(this);
+      asm.movq("%rax", "%rbx");
+      e.e1.accept(this);
+      switch (e.op) {
+        case Badd:
+          asm.framecall("add");
+          break;
+        case Bdiv:
+          asm.framecall("div");
+          break;
+        case Beq:
+          asm.framecall("Beq");
+          break;
+        case Bge:
+          asm.framecall("Bge");
+          break;
+        case Bgt:
+          asm.framecall("Bgt");
+          break;
+        case Ble:
+          asm.framecall("Ble");
+          break;
+        case Blt:
+          asm.framecall("Blt");
+          break;
+        case Bmod:
+          asm.framecall("mod");
+          break;
+        case Bmul:
+          asm.framecall("mul");
+          break;
+        case Bneq:
+          break;
+        case Bsub:
+          break;
+      }
+      break;
     }
   }
 
@@ -189,6 +231,17 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEget e) {
+    // ne fonctionne pas pour l'instant, juste un brouillon
+    e.e1.accept(this);
+    asm.pushq("%rax");
+    e.e2.accept(this);
+    // System.out.println(e.e1.toString());
+    System.out.println(e.e2.toString());
+    asm.movq("%rax", "%rbx");
+    asm.popq("%rax");
+    asm.movq("$long_format", "%rdi");
+    asm.movq("%rbx", "%rsi");
+    asm.framecall("print");
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit(TEget e)'");
   }
@@ -220,8 +273,48 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TErange e) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TErange e)'");
+    e.e.accept(this);
+    int type = 4;
+    asm.cmpq(2, "(%rax)");
+    asm.je("for_range_" + e.hashCode());
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$Global_Error", "%rsi");
+    asm.movq(0, "%rax");
+    asm.framecall("printf");
+    asm.movq(1, "%rdi"); // Operation not permitted
+    asm.framecall("exit");
+
+    asm.label("for_range_" + e.hashCode());
+    asm.pushq("%r12");
+    asm.pushq("%r13");
+    asm.pushq("%r14");
+    asm.movq("%rax", "%r12");
+    asm.framecall("my_malloc");
+    asm.movq(type, "(%rax)"); // type
+    asm.movq("8(%r12)", "%r14"); // size
+    asm.movq("%r14", "8(%rax)"); // list size
+    asm.movq(0, "%r12");
+    asm.addq(16, "%rax"); // first address
+    asm.movq("%rax", "%r13");
+
+    asm.label("range_loop_" + e.hashCode());
+    asm.cmpq("%r12", "%r14");
+    asm.je("end_range_" + e.hashCode());
+    asm.movq(16, "%rdi");
+    asm.call("my_malloc");
+    asm.movq(2, "(%rax)");
+    asm.movq("%r12", "8(%rax)");
+    asm.movq("%rax", "(%r13,%r12,8)");
+    asm.addq(1,"%r12");
+    asm.jmp("range_loop_" + e.hashCode());
+
+    asm.label("end_range_" + e.hashCode());
+    asm.movq("%r13", "%rax");
+    asm.popq("%r14");
+    asm.popq("%r13");
+    asm.popq("%r12");
+    asm.addq(-16, "%rax");
+
   }
 
   @Override
@@ -270,25 +363,30 @@ class Compiler implements TVisitor {
     asm.cmpq(4, "(%rax)");
     asm.je("for_list_" + s.hashCode());
     asm.movq("$string_format", "%rdi");
-    asm.movq("$intAdd_TypeError", "%rsi");
+    asm.movq("$Global_Error", "%rsi");
     asm.movq(0, "%rax");
     asm.framecall("printf");
     asm.movq(1, "%rdi"); // Operation not permitted
     asm.framecall("exit");
+
     asm.label("for_list_" + s.hashCode());
     asm.pushq("%r12");
     asm.pushq("%r14");
     asm.movq("8(%rax)", "%r12"); // size
     asm.movq("%rax", "%r14");
     asm.addq(8, "%r14"); // first elmt
+
     asm.label("for_loop_" + s.hashCode());
+    asm.cmpq(0, "%r12");
+    asm.je("end_for_" + s.hashCode());
     asm.addq(8,"%r14");
     asm.movq("(%r14)", "%rax");
     asm.movq("%rax", s.x.ofs + "(%rbp)");
     s.s.accept(this);
     asm.decq("%r12");
-    asm.cmpq(0, "%r12");
-    asm.jne("for_loop_" + s.hashCode());
+    asm.jmp("for_loop_" + s.hashCode());
+
+    asm.label("end_for_" + s.hashCode());
     asm.popq("%r14");
     asm.popq("%r12");
   }
@@ -337,7 +435,51 @@ class BuiltInFunctions {
     functions.add(Band());
     functions.add(set());
     functions.add(bool());
+    functions.add(error());
+    functions.add(len());
     return functions;
+  }
+
+  /*
+   * L'implémentation du détail des erreurs à runtime n'est pas obligatoire 
+   * donc pour éviter de mettre des fausses erreurs, 
+   * j'ai déclaré cette erreur qu'on peut utiliser n'importe où
+   */
+  private static X86_64 error(){
+    X86_64 error = new X86_64();
+    error.dlabel("Global_Error");
+    error.string("Error\n");
+    return error;
+  }
+
+  /*
+   * La fameuse fonction len qui prend dans %rax une liste et qui renvoit sa longueur dans %rax
+   */
+  private static X86_64 len() {
+    X86_64 len = new X86_64();
+    len.label("len");
+    len.movq("8(%rbp)", "%rax");
+    // len.movq("(%r8)", "%rax");
+    len.cmpq(4, "(%rax)");
+    len.je("len_bon");
+    len.label("len_error");
+    len.movq("$string_format", "%rdi");
+    len.movq("$Global_Error", "%rsi");
+    len.movq(0, "%rax");
+    len.framecall("printf");
+    len.movq(1, "%rdi"); // Operation not permitted
+    len.framecall("exit");
+    len.label("len_bon");
+    len.movq("8(%rax)", "%r8");
+    len.pushq("%r8");
+    len.movq(16, "%rdi");
+    len.call("my_malloc");
+    len.movq(2, "(%rax)");
+    len.popq("%r8");
+    len.movq("%r8", "8(%rax)");
+    len.ret();
+
+    return len;
   }
 
   /*
