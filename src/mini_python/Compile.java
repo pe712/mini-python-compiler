@@ -134,6 +134,7 @@ class Compiler implements TVisitor {
       case Bmod:
         break;
       case Bmul:
+        asm.framecall("mul");
         break;
       case Bneq:
         break;
@@ -294,6 +295,7 @@ class BuiltInFunctions {
     functions.add(print());
     functions.add(printNewline());
     functions.add(add());
+    functions.add(mul());
     functions.add(set());
     functions.add(bool());
     return functions;
@@ -696,6 +698,27 @@ class BuiltInFunctions {
     intAdder.movq("%rsi", "%rbx");
     intAdder.merge(switchType("stringAdd", error, error, error, stringConcatenation, error));
     return intAdder;
+  }
+
+  /*
+   * expect the two pointers in %rax and %rbx
+   * result in %rax
+   */
+  private static X86_64 mul() {
+    X86_64 multiplicater = new X86_64();
+    multiplicater.label("mul");
+    // calcul du résulat
+    multiplicater.movq("8(%rbx)", "%rbx");
+    multiplicater.movq("8(%rax)", "%r8");
+    multiplicater.imulq("%r8", "%rbx");
+    // mise en mémoire du résultat
+    multiplicater.movq(16, "%rdi");
+    multiplicater.call("my_malloc");
+    multiplicater.movq(2, "(%rax)");
+    multiplicater.movq("%rbx", "8(%rax)");
+
+    multiplicater.ret();
+    return multiplicater;
   }
 
 }
