@@ -1,4 +1,7 @@
-print(2<3)
+l = [1,2,3]
+for x in l:
+    l = []
+    print(x)
 
 # if 0:
 #     print(5)

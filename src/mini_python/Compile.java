@@ -266,8 +266,31 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TSfor s) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TSfor s)'");
+    s.e.accept(this);
+    asm.cmpq(4, "(%rax)");
+    asm.je("for_list_" + s.hashCode());
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$intAdd_TypeError", "%rsi");
+    asm.movq(0, "%rax");
+    asm.framecall("printf");
+    asm.movq(1, "%rdi"); // Operation not permitted
+    asm.framecall("exit");
+    asm.label("for_list_" + s.hashCode());
+    asm.pushq("%r12");
+    asm.pushq("%r14");
+    asm.movq("8(%rax)", "%r12"); // size
+    asm.movq("%rax", "%r14");
+    asm.addq(8, "%r14"); // first elmt
+    asm.label("for_loop_" + s.hashCode());
+    asm.addq(8,"%r14");
+    asm.movq("(%r14)", "%rax");
+    asm.movq("%rax", s.x.ofs + "(%rbp)");
+    s.s.accept(this);
+    asm.decq("%r12");
+    asm.cmpq(0, "%r12");
+    asm.jne("for_loop_" + s.hashCode());
+    asm.popq("%r14");
+    asm.popq("%r12");
   }
 
   @Override
@@ -892,15 +915,18 @@ class BuiltInFunctions {
     X86_64 divider = new X86_64();
     divider.label("Band");
     // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.jl("Blt_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Blt_end");
-    divider.label("Blt_true");
+    divider.framecall("bool");
+    divider.cmpq(0,"8(%rax)");
+    divider.je("Band_false");
+    divider.movq("%rbx", "%rax");
+    divider.framecall("bool");
+    divider.cmpq(0,"8(%rax)");
+    divider.je("Band_false");
     divider.movq(1, "%rbx");
-    divider.label("Blt_end");
+    divider.jmp("Band_end");
+    divider.label("Band_false");
+    divider.movq(0, "%rbx");
+    divider.label("Band_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
     divider.call("my_malloc");
