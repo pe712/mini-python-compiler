@@ -117,21 +117,29 @@ class Compiler implements TVisitor {
         asm.framecall("add");
         break;
       case Band:
+        asm.framecall("Band");
         // TODO
         break;
       case Bdiv:
+        asm.framecall("div");
         break;
       case Beq:
+        asm.framecall("Beq");
         break;
       case Bge:
+        asm.framecall("Bge");
         break;
       case Bgt:
+        asm.framecall("Bgt");
         break;
       case Ble:
+        asm.framecall("Ble");
         break;
       case Blt:
+        asm.framecall("Blt");
         break;
       case Bmod:
+        asm.framecall("mod");
         break;
       case Bmul:
         asm.framecall("mul");
@@ -296,6 +304,14 @@ class BuiltInFunctions {
     functions.add(printNewline());
     functions.add(add());
     functions.add(mul());
+    functions.add(div());
+    functions.add(mod());
+    functions.add(Beq());
+    functions.add(Bge());
+    functions.add(Bgt());
+    functions.add(Ble());
+    functions.add(Blt());
+    functions.add(Band());
     functions.add(set());
     functions.add(bool());
     return functions;
@@ -719,6 +735,180 @@ class BuiltInFunctions {
 
     multiplicater.ret();
     return multiplicater;
+  }
+
+  private static X86_64 div() {
+    X86_64 divider = new X86_64();
+    divider.label("div");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.idivq("%rbx");
+    divider.movq("%rax", "%rbx");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(2, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 mod() {
+    X86_64 divider = new X86_64();
+    divider.label("mod");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.idivq("%rbx");
+    divider.movq("%rdx", "%rbx");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(2, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Beq() {
+    X86_64 divider = new X86_64();
+    divider.label("Beq");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.je("Beq_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Beq_end");
+    divider.label("Beq_true");
+    divider.movq(1, "%rbx");
+    divider.label("Beq_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Bge() {
+    X86_64 divider = new X86_64();
+    divider.label("Bge");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.jge("Bge_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Bge_end");
+    divider.label("Bge_true");
+    divider.movq(1, "%rbx");
+    divider.label("Bge_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Bgt() {
+    X86_64 divider = new X86_64();
+    divider.label("Bgt");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.jg("Bgt_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Bgt_end");
+    divider.label("Bgt_true");
+    divider.movq(1, "%rbx");
+    divider.label("Bgt_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Ble() {
+    X86_64 divider = new X86_64();
+    divider.label("Ble");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.jle("Ble_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Ble_end");
+    divider.label("Ble_true");
+    divider.movq(1, "%rbx");
+    divider.label("Ble_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Blt() {
+    X86_64 divider = new X86_64();
+    divider.label("Blt");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.jl("Blt_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Blt_end");
+    divider.label("Blt_true");
+    divider.movq(1, "%rbx");
+    divider.label("Blt_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
+  }
+
+  private static X86_64 Band() {
+    X86_64 divider = new X86_64();
+    divider.label("Band");
+    // calcul du résulat
+    divider.movq("8(%rbx)", "%rbx");
+    divider.movq("8(%rax)", "%rax");
+    divider.cmpq("%rbx", "%rax");
+    divider.jl("Blt_true");
+    divider.movq(0, "%rbx");
+    divider.jmp("Blt_end");
+    divider.label("Blt_true");
+    divider.movq(1, "%rbx");
+    divider.label("Blt_end");
+    // mise en mémoire du résultat
+    divider.movq(16, "%rdi");
+    divider.call("my_malloc");
+    divider.movq(1, "(%rax)");
+    divider.movq("%rbx", "8(%rax)");
+
+    divider.ret();
+    return divider;
   }
 
 }
