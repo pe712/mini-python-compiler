@@ -231,19 +231,24 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEget e) {
-    // ne fonctionne pas pour l'instant, juste un brouillon
     e.e1.accept(this);
     asm.pushq("%rax");
     e.e2.accept(this);
-    // System.out.println(e.e1.toString());
-    System.out.println(e.e2.toString());
     asm.movq("%rax", "%rbx");
     asm.popq("%rax");
-    asm.movq("$long_format", "%rdi");
-    asm.movq("%rbx", "%rsi");
-    asm.framecall("print");
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TEget e)'");
+    asm.movq(0, "%rsi");
+    asm.movq("8(%rbx)", "%rbx");
+    asm.cmpq("%rbx", "8(%rax)");
+    asm.jg("get_bon_" + e.hashCode());
+    asm.movq("$string_format", "%rdi");
+    asm.movq("$Global_Error", "%rsi");
+    asm.movq(0, "%rax");
+    asm.framecall("printf");
+    asm.movq(1, "%rdi"); // Operation not permitted
+    asm.framecall("exit");
+    asm.label("get_bon_" + e.hashCode());
+    asm.addq(16,"%rax");
+    asm.movq("(%rax,%rbx,8)", "%rax");
   }
 
   @Override
@@ -399,13 +404,13 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSset s) {
     s.e1.accept(this);
-    asm.label("e1");
+    asm.label("e1_"+s.hashCode());
     asm.pushq("%rax");
     s.e2.accept(this);
-    asm.label("e2");
+    asm.label("e2_" + s.hashCode());
     asm.pushq("%rax");
     s.e3.accept(this);
-    asm.label("e3");
+    asm.label("e3_" + s.hashCode());
     asm.movq("%rax", "%rdx");
     asm.popq("%rsi");
     asm.popq("%rdi");
