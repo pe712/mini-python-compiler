@@ -200,13 +200,13 @@ class Compiler implements TVisitor {
     e.e.accept(this);
     switch (e.op) {
       case Uneg:
-        // TODO
+        e.e.accept(this);
+        asm.negq("8(%rax)");
         break;
       case Unot:
-        break;
-    }
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit(TEunop e)'");
+        throw new UnsupportedOperationException("Unimplemented method 'visit(TEunop Unot)'");
+        // break;
+    }    
   }
 
   @Override
@@ -736,8 +736,10 @@ class BuiltInFunctions {
     asm.movq("(%r8)", "%rax");
     asm.addq(8, "%r8");
     asm.pushq("%r8");
+    asm.pushq("%r10");
     asm.movq(1, "%rsi"); // no endline
     asm.framecall("print");
+    asm.popq("%r10");
     asm.jmp("printList_loop");
 
     asm.label("printList_end_loop");
