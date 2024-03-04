@@ -983,63 +983,32 @@ class BuiltInFunctions {
   private static X86_64 Beq() {
     X86_64 boolEq = new X86_64();
     boolEq.movq("8(%rbx)", "%rbx");
-    boolEq.andq("8(%rax)", "%rbx");
+    boolEq.cmpq("8(%rax)", "%rbx");
+    boolEq.movq(0, "%rbx");
+    boolEq.setnz("%bl");
     boolEq.merge(BuiltInFunctions.allocateTCbool());
     boolEq.movq("%rbx", "8(%rax)");
+    boolEq.ret();
+  
+    X86_64 stringBeq = new X86_64();
+    stringBeq.label("stringBeq");
+    stringBeq.leaq("16(%rax)", "%rsi");
+    stringBeq.leaq("16(%rbx)", "%rdi");
+    stringBeq.allignedFramecall("strcmp");
+    stringBeq.movq(0, "%rbx");
+    stringBeq.cmpq(0, "%rax");
+    stringBeq.setz("%bl");
+    stringBeq.merge(BuiltInFunctions.allocateTCbool());
+    stringBeq.movq("%rbx", "8(%rax)");
+    stringBeq.ret();
 
 
     X86_64 Beq = new X86_64();
     Beq.label("Beq");
-    Beq.merge(switchType("Beq",  new X86_64(), boolEq, intBeq(), stringBeq(), new X86_64()));
-    Beq.ret();
+    Beq.merge(switchType("Beq",  new X86_64(), boolEq, boolEq, stringBeq, new X86_64()));
     return Beq;
   }
 
-  private static X86_64 intBeq() {
-    X86_64 intBeq = new X86_64();
-    intBeq.label("intBeq");
-    // calcul du résulat
-    intBeq.movq("8(%rbx)", "%rbx");
-    intBeq.movq("8(%rax)", "%rax");
-    intBeq.cmpq("%rbx", "%rax");
-    intBeq.je("intBeq_true");
-    intBeq.movq(0, "%rbx");
-    intBeq.jmp("intBeq_end");
-    intBeq.label("intBeq_true");
-    intBeq.movq(1, "%rbx");
-    intBeq.label("intBeq_end");
-    // mise en mémoire du résultat
-    intBeq.movq(16, "%rdi");
-    intBeq.allignedFramecall("malloc");
-    intBeq.movq(1, "(%rax)");
-    intBeq.movq("%rbx", "8(%rax)");
-
-    intBeq.ret();
-    return intBeq;
-  }
-
-  private static X86_64 stringBeq() {
-    X86_64 intBeq = new X86_64();
-    intBeq.label("stringBeq");
-    // calcul du résulat
-    // intBeq.movq("8(%rbx)", "%rbx");
-    // intBeq.movq("8(%rax)", "%rax");
-    // intBeq.cmpq("%rbx", "%rax");
-    // intBeq.je("intBeq_true");
-    // intBeq.movq(0, "%rbx");
-    // intBeq.jmp("intBeq_end");
-    // intBeq.label("intBeq_true");
-    // intBeq.movq(1, "%rbx");
-    // intBeq.label("intBeq_end");
-    // // mise en mémoire du résultat
-    // intBeq.movq(16, "%rdi");
-    // intBeq.allignedFramecall("malloc");
-    // intBeq.movq(1, "(%rax)");
-    // intBeq.movq("%rbx", "8(%rax)");
-
-    intBeq.ret();
-    return intBeq;
-  }
 
   private static X86_64 Bge() {
     X86_64 divider = new X86_64();
