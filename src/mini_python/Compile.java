@@ -946,26 +946,57 @@ class BuiltInFunctions {
   }
 
   private static X86_64 Beq() {
-    X86_64 divider = new X86_64();
-    divider.label("Beq");
-    // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.je("Beq_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Beq_end");
-    divider.label("Beq_true");
-    divider.movq(1, "%rbx");
-    divider.label("Beq_end");
-    // mise en mémoire du résultat
-    divider.movq(16, "%rdi");
-    divider.call("my_malloc");
-    divider.movq(1, "(%rax)");
-    divider.movq("%rbx", "8(%rax)");
+    X86_64 Beq = new X86_64();
+    Beq.label("Beq");
+    Beq.merge(switchType("Beq", new X86_64(), new X86_64(), intBeq(), stringBeq(), new X86_64()));
+    Beq.ret();
+    return Beq;
+  }
 
-    divider.ret();
-    return divider;
+  private static X86_64 intBeq() {
+    X86_64 intBeq = new X86_64();
+    intBeq.label("intBeq");
+    // calcul du résulat
+    intBeq.movq("8(%rbx)", "%rbx");
+    intBeq.movq("8(%rax)", "%rax");
+    intBeq.cmpq("%rbx", "%rax");
+    intBeq.je("intBeq_true");
+    intBeq.movq(0, "%rbx");
+    intBeq.jmp("intBeq_end");
+    intBeq.label("intBeq_true");
+    intBeq.movq(1, "%rbx");
+    intBeq.label("intBeq_end");
+    // mise en mémoire du résultat
+    intBeq.movq(16, "%rdi");
+    intBeq.call("my_malloc");
+    intBeq.movq(1, "(%rax)");
+    intBeq.movq("%rbx", "8(%rax)");
+
+    intBeq.ret();
+    return intBeq;
+  }
+
+  private static X86_64 stringBeq() {
+    X86_64 intBeq = new X86_64();
+    intBeq.label("stringBeq");
+    // calcul du résulat
+    // intBeq.movq("8(%rbx)", "%rbx");
+    // intBeq.movq("8(%rax)", "%rax");
+    // intBeq.cmpq("%rbx", "%rax");
+    // intBeq.je("intBeq_true");
+    // intBeq.movq(0, "%rbx");
+    // intBeq.jmp("intBeq_end");
+    // intBeq.label("intBeq_true");
+    // intBeq.movq(1, "%rbx");
+    // intBeq.label("intBeq_end");
+    // // mise en mémoire du résultat
+    // intBeq.movq(16, "%rdi");
+    // intBeq.call("my_malloc");
+    // intBeq.movq(1, "(%rax)");
+    // intBeq.movq("%rbx", "8(%rax)");
+
+    intBeq.ret();
+    return intBeq;
   }
 
   private static X86_64 Bge() {
