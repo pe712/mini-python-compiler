@@ -28,4 +28,14 @@ print(badmatrix)
 #     print(3)
 # else:
 #     print(None)
+def a(b, x, c):
+    b = 2
+    x= 3
+    print(b)
+    print(x)
+    print(c)
 
+x=88
+y = 2
+a(x, x, x)
+print(x)

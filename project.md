@@ -61,8 +61,7 @@ f-string and .format and %s
 
 useful commands:
 
-make
-gcc -g test.s -o test_exe
+make && gcc -g test.s -o test_exe && ./test_exe
 
 bash ./test -v2 ./minipython
 
