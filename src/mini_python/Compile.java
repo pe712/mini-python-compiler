@@ -34,21 +34,17 @@ class Compiler implements TVisitor {
 
   public void terminate() {
     asm.movq(0, "%rdi");
-    asm.framecall("exit");
+    asm.call("exit");
   }
 
   public void visit(TDef tDef) {
     if (tDef.f.name.equals("__main__")) {
       asm.label("main");
-      asm.movq("%rsp", "%rbp");
     } else
       asm.label(tDef.f.name);
-    // allocate localVariables on the stack TODO :
-    // asm.xorq("%rax", "%rax");
-    asm.movq(55, "%rax");
-    for (Variable variable : tDef.localVariables.values()) {
-      asm.pushq("%rax");
-    }
+
+    asm.movq("%rsp", "%rbp");
+    asm.addq(tDef.localVariables.size() * 8, "%rsp");
     tDef.body.accept(this);
   }
 
@@ -65,12 +61,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCnone c) {
-    int type = 0;
-    // type (8) + int (8)
-    asm.movq(16, "%rdi");
-    asm.call("my_malloc");
-    asm.movq(type, "(%rax)"); // type
-    asm.movq(0, "8(%rax)");
+    asm.merge(BuiltInFunctions.allocateTCnone());
   }
 
   @Override
@@ -86,7 +77,7 @@ class Compiler implements TVisitor {
     int size = string.length;
     // type (8) + size (8) + character (1) * size + end zero char (1)
     asm.movq(size + 17, "%rdi");
-    asm.call("my_malloc");
+    asm.allignedFramecall("malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     asm.movq(size, "8(%rax)"); // string size
@@ -98,12 +89,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TCint c) {
-    int type = 2;
-    // type (8) + int (8)
-    asm.movq(16, "%rdi");
-    asm.call("my_malloc");
-    // address in %rax
-    asm.movq(type, "(%rax)"); // type
+    asm.merge(BuiltInFunctions.allocateTCint());
     asm.movq(c.c.i, "8(%rax)"); // data
   }
 
@@ -128,7 +114,7 @@ class Compiler implements TVisitor {
         // mise en mémoire du résultat
         asm.pushq("%r8");
         asm.movq(16, "%rdi");
-        asm.call("my_malloc");
+        asm.allignedFramecall("malloc");
         asm.movq(1, "(%rax)");
         asm.popq("%r8");
         asm.movq("%r8", "8(%rax)");
@@ -150,7 +136,7 @@ class Compiler implements TVisitor {
         // mise en mémoire du résultat
         asm.pushq("%r8");
         asm.movq(16, "%rdi");
-        asm.call("my_malloc");
+        asm.allignedFramecall("malloc");
         asm.movq(1, "(%rax)");
         asm.popq("%r8");
         asm.movq("%r8", "8(%rax)");
@@ -161,10 +147,10 @@ class Compiler implements TVisitor {
         e.e1.accept(this);
         switch (e.op) {
           case Badd:
-            asm.framecall("add");
+            asm.framecall("Badd");
             break;
           case Bdiv:
-            asm.framecall("div");
+            asm.framecall("Bdiv");
             break;
           case Beq:
             asm.framecall("Beq");
@@ -182,15 +168,16 @@ class Compiler implements TVisitor {
             asm.framecall("Blt");
             break;
           case Bmod:
-            asm.framecall("mod");
+            asm.framecall("Bmod");
             break;
           case Bmul:
-            asm.framecall("mul");
+            asm.framecall("Bmul");
             break;
           case Bneq:
             break;
           case Bsub:
             break;
+          default:
         }
         break;
     }
@@ -221,12 +208,15 @@ class Compiler implements TVisitor {
     Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
     while (backArgsIterator.hasNext()) {
       backArgsIterator.next().accept(this);
-      // TODO: make a copy of each argument to pass by value
+      asm.call("copy"); // make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
     // return address is pushed on the stack by call
     // asm.pushq("%rbp");
     asm.framecall(e.f.name);
+    for (int i = 0; i < e.l.size(); i++) {
+      asm.popq("%rsi"); // reallign the stack but do not erase rax
+    }
     // TODO : match corresponding label
   }
 
@@ -244,9 +234,9 @@ class Compiler implements TVisitor {
     asm.movq("$string_format", "%rdi");
     asm.movq("$Global_Error", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.movq(1, "%rdi"); // Operation not permitted
-    asm.framecall("exit");
+    asm.call("exit");
     asm.label("get_bon_" + e.hashCode());
     asm.addq(16, "%rax");
     asm.movq("(%rax,%rbx,8)", "%rax");
@@ -259,7 +249,7 @@ class Compiler implements TVisitor {
     // type (8) + size (8) + pointer to value (8) * size
     int allocSize = size * 8 + 16;
     asm.movq(allocSize, "%rdi");
-    asm.call("my_malloc");
+    asm.allignedFramecall("malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     asm.movq(size, "8(%rax)"); // list size
@@ -286,16 +276,16 @@ class Compiler implements TVisitor {
     asm.movq("$string_format", "%rdi");
     asm.movq("$Global_Error", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.movq(1, "%rdi"); // Operation not permitted
-    asm.framecall("exit");
+    asm.call("exit");
 
     asm.label("for_range_" + e.hashCode());
     asm.pushq("%r12");
     asm.pushq("%r13");
     asm.pushq("%r14");
     asm.movq("%rax", "%r12");
-    asm.framecall("my_malloc");
+    asm.allignedFramecall("malloc");
     asm.movq(type, "(%rax)"); // type
     asm.movq("8(%r12)", "%r14"); // size
     asm.movq("%r14", "8(%rax)"); // list size
@@ -307,7 +297,7 @@ class Compiler implements TVisitor {
     asm.cmpq("%r12", "%r14");
     asm.je("end_range_" + e.hashCode());
     asm.movq(16, "%rdi");
-    asm.call("my_malloc");
+    asm.allignedFramecall("malloc");
     asm.movq(2, "(%rax)");
     asm.movq("%r12", "8(%rax)");
     asm.movq("%rax", "(%r13,%r12,8)");
@@ -340,6 +330,7 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSreturn s) {
     s.e.accept(this);
+    asm.movq("%rbp", "%rsp");
     asm.ret();
   }
 
@@ -371,9 +362,9 @@ class Compiler implements TVisitor {
     asm.movq("$string_format", "%rdi");
     asm.movq("$Global_Error", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.movq(1, "%rdi"); // Operation not permitted
-    asm.framecall("exit");
+    asm.call("exit");
 
     asm.label("for_list_" + s.hashCode());
     asm.pushq("%r12");
@@ -426,13 +417,12 @@ class Compiler implements TVisitor {
 class BuiltInFunctions {
   public static LinkedList<X86_64> getFunctions() {
     LinkedList<X86_64> functions = new LinkedList<X86_64>();
-    functions.add(myMalloc());
     functions.add(print());
     functions.add(printNewline());
-    functions.add(add());
-    functions.add(mul());
-    functions.add(div());
-    functions.add(mod());
+    functions.add(Badd());
+    functions.add(Bmul());
+    functions.add(Bdiv());
+    functions.add(Bmod());
     functions.add(Beq());
     functions.add(Bge());
     functions.add(Bgt());
@@ -443,6 +433,7 @@ class BuiltInFunctions {
     functions.add(bool());
     functions.add(error());
     functions.add(len());
+    functions.add(copy());
     return functions;
   }
 
@@ -473,14 +464,14 @@ class BuiltInFunctions {
     len.movq("$string_format", "%rdi");
     len.movq("$Global_Error", "%rsi");
     len.movq(0, "%rax");
-    len.framecall("printf");
+    len.allignedFramecall("printf");
     len.movq(1, "%rdi"); // Operation not permitted
-    len.framecall("exit");
+    len.call("exit");
     len.label("len_bon");
     len.movq("8(%rax)", "%r8");
     len.pushq("%r8");
     len.movq(16, "%rdi");
-    len.call("my_malloc");
+    len.allignedFramecall("malloc");
     len.movq(2, "(%rax)");
     len.popq("%r8");
     len.movq("%r8", "8(%rax)");
@@ -509,15 +500,70 @@ class BuiltInFunctions {
     return toBool;
   }
 
+  public static X86_64 allocateTCnone() {
+    X86_64 asm = new X86_64();
+    int type = 0;
+    // type (8) + int (8)
+    asm.movq(16, "%rdi");
+    asm.allignedFramecall("malloc");
+    asm.movq(type, "(%rax)"); // type
+    asm.movq(0, "8(%rax)");
+    return asm;
+  }
+
   public static X86_64 allocateTCbool() {
     X86_64 asm = new X86_64();
     int type = 1;
     // type (8) + int (8)
     asm.movq(16, "%rdi");
-    asm.call("my_malloc");
+    asm.allignedFramecall("malloc");
     // address in %rax
     asm.movq(type, "(%rax)"); // type
     return asm;
+  }
+
+  public static X86_64 allocateTCint() {
+    X86_64 asm = new X86_64();
+    int type = 2;
+    // type (8) + int (8)
+    asm.movq(16, "%rdi");
+    asm.allignedFramecall("malloc");
+    asm.movq(type, "(%rax)");
+    return asm;
+  }
+
+  /*
+   * expects in %rax the pointer to the heap allocated data to copy
+   * uses %r12 for the size to copy
+   */
+  private static X86_64 copy() {
+    // copy 16 bytes
+    X86_64 copyLong = new X86_64();
+    copyLong.movq(16, "%r12");
+
+    // copy n bytes + 17
+    X86_64 copyString = new X86_64();
+    copyString.movq("8(%rax)", "%r12"); // n = size in bytes
+    copyString.addq(17, "%r12");
+
+    // copy n*8 bytes + 16
+    X86_64 copyList = new X86_64();
+    copyString.movq("8(%rax)", "%r12"); // n = size in bytes
+    copyString.imulq(8, "%r12");
+    copyString.addq(16, "%r12");
+
+    X86_64 copier = new X86_64();
+    copier.label("copy");
+    copier.merge(switchType("copy", allocateTCnone(), copyLong, copyLong, copyString, copyList));
+    copier.movq("%rax", "%rbx");
+    copier.movq("%r12", "%rdi");
+    copier.allignedFramecall("malloc");
+    copier.movq("%rbx", "%rsi"); // src
+    copier.movq("%rax", "%rdi"); // dst
+    copier.movq("%r12", "%rdx");
+    copier.allignedFramecall("memcpy");
+    copier.ret();
+    return copier;
   }
 
   /*
@@ -528,9 +574,9 @@ class BuiltInFunctions {
     error.movq("$string_format", "%rdi");
     error.movq("$TSset_TypeError_index", "%rsi");
     error.movq(0, "%rax");
-    error.framecall("printf");
+    error.allignedFramecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.framecall("exit");
+    error.call("exit");
 
     X86_64 effectiveSetter = new X86_64();
     // rdi = list pointer
@@ -550,19 +596,6 @@ class BuiltInFunctions {
     setter.merge(switchType("set", error, error, effectiveSetter, error, error));
     return setter;
     // TODO: out of range error
-  }
-
-  private static X86_64 myMalloc() {
-    X86_64 allignedAlloc = new X86_64();
-    allignedAlloc.label("my_malloc");
-    allignedAlloc.pushq("%rbp");
-    allignedAlloc.movq("%rsp", "%rbp");
-    allignedAlloc.addq(-16, "%rsp"); // 16-byte stack alignment
-    allignedAlloc.call("malloc");
-    allignedAlloc.movq("%rbp", "%rsp");
-    allignedAlloc.popq("%rbp");
-    allignedAlloc.ret();
-    return allignedAlloc;
   }
 
   private static X86_64 switchType(String SwitchName, X86_64 NoneAsm, X86_64 BoolAsm, X86_64 IntAsm, X86_64 StringAsm,
@@ -620,7 +653,7 @@ class BuiltInFunctions {
     newliner.movq("$string_format", "%rdi");
     newliner.movq("$newline", "%rsi");
     newliner.movq(0, "%rax");
-    newliner.framecall("printf");
+    newliner.allignedFramecall("printf");
     newliner.label("print_newline_end");
     newliner.ret();
     return newliner;
@@ -636,7 +669,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$none", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.popq("%rsi");
     asm.framecall("print_newline");
     asm.ret();
@@ -664,7 +697,7 @@ class BuiltInFunctions {
     asm.label("end_print_bool");
 
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
 
     asm.popq("%rsi");
     asm.framecall("print_newline");
@@ -682,7 +715,7 @@ class BuiltInFunctions {
     asm.movq("8(%rax)", "%rsi"); // quand on affiche un entier, on passe en argument la valeur de l'entier et pas
                                  // son adresse
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.popq("%rsi");
     asm.framecall("print_newline");
     asm.ret();
@@ -710,7 +743,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$left_bracket", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
 
     asm.movq(0, "%r10"); // first iteration
     asm.label("printList_loop");
@@ -727,7 +760,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$comma", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.jmp("printList_every_elmt");
 
     asm.label("printList_first_elmt");
@@ -748,7 +781,7 @@ class BuiltInFunctions {
     asm.movq("$string_format", "%rdi");
     asm.movq("$right_bracket", "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.popq("%rsi");
     asm.framecall("print_newline");
     asm.ret();
@@ -766,7 +799,7 @@ class BuiltInFunctions {
     asm.movq("%rax", "%rsi");
     asm.addq(16, "%rsi");
     asm.movq(0, "%rax");
-    asm.framecall("printf");
+    asm.allignedFramecall("printf");
     asm.popq("%rsi");
     asm.framecall("print_newline");
     asm.ret();
@@ -777,10 +810,10 @@ class BuiltInFunctions {
    * expect the two pointers in %rax and %rbx
    * result in %rax
    */
-  private static X86_64 add() {
+  private static X86_64 Badd() {
     X86_64 adder = new X86_64();
-    adder.label("add");
-    adder.merge(switchType("add", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
+    adder.label("Badd");
+    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
     adder.ret();
     return adder;
   }
@@ -792,20 +825,17 @@ class BuiltInFunctions {
     X86_64 intAddition = new X86_64();
     intAddition.movq("8(%rbx)", "%rbx"); // first int in %rbx
     intAddition.addq("8(%rax)", "%rbx"); // result in %rbx
-    // copied from TCint :
-    int type = 2;
-    intAddition.movq(16, "%rdi");
-    intAddition.call("my_malloc");
-    intAddition.movq(type, "(%rax)");
+
+    intAddition.merge(BuiltInFunctions.allocateTCint());
     intAddition.movq("%rbx", "8(%rax)"); // store result
 
     X86_64 error = new X86_64();
     error.movq("$string_format", "%rdi");
     error.movq("$intAdd_TypeError", "%rsi");
     error.movq(0, "%rax");
-    error.framecall("printf");
+    error.allignedFramecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.framecall("exit");
+    error.call("exit");
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("intAdd_TypeError");
@@ -830,8 +860,8 @@ class BuiltInFunctions {
     stringConcatenation.movq("%r14", "%rdi");
     stringConcatenation.addq(17, "%rdi"); // allocation size
     stringConcatenation.movq("%rdi", "%r13"); // callee saved
-    stringConcatenation.call("my_malloc");
-    // copied from TCstring :
+    stringConcatenation.allignedFramecall("malloc");
+
     int type = 3;
     stringConcatenation.movq(type, "(%rax)");
     stringConcatenation.movq("%r14", "8(%rax)");
@@ -875,9 +905,9 @@ class BuiltInFunctions {
     error.movq("$string_format", "%rdi");
     error.movq("$StringAdd_TypeError", "%rsi");
     error.movq(0, "%rax");
-    error.framecall("printf");
+    error.allignedFramecall("printf");
     error.movq(1, "%rdi"); // Operation not permitted
-    error.framecall("exit");
+    error.call("exit");
 
     X86_64 intAdder = new X86_64();
     intAdder.dlabel("StringAdd_TypeError");
@@ -894,16 +924,16 @@ class BuiltInFunctions {
    * expect the two pointers in %rax and %rbx
    * result in %rax
    */
-  private static X86_64 mul() {
+  private static X86_64 Bmul() {
     X86_64 multiplicater = new X86_64();
-    multiplicater.label("mul");
+    multiplicater.label("Bmul");
     // calcul du résulat
     multiplicater.movq("8(%rbx)", "%rbx");
     multiplicater.movq("8(%rax)", "%r8");
     multiplicater.imulq("%r8", "%rbx");
     // mise en mémoire du résultat
     multiplicater.movq(16, "%rdi");
-    multiplicater.call("my_malloc");
+    multiplicater.allignedFramecall("malloc");
     multiplicater.movq(2, "(%rax)");
     multiplicater.movq("%rbx", "8(%rax)");
 
@@ -911,9 +941,9 @@ class BuiltInFunctions {
     return multiplicater;
   }
 
-  private static X86_64 div() {
+  private static X86_64 Bdiv() {
     X86_64 divider = new X86_64();
-    divider.label("div");
+    divider.label("Bdiv");
     // calcul du résulat
     divider.movq("8(%rbx)", "%rbx");
     divider.movq("8(%rax)", "%rax");
@@ -921,7 +951,7 @@ class BuiltInFunctions {
     divider.movq("%rax", "%rbx");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(2, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -929,9 +959,9 @@ class BuiltInFunctions {
     return divider;
   }
 
-  private static X86_64 mod() {
+  private static X86_64 Bmod() {
     X86_64 divider = new X86_64();
-    divider.label("mod");
+    divider.label("Bmod");
     // calcul du résulat
     divider.movq("8(%rbx)", "%rbx");
     divider.movq("8(%rax)", "%rax");
@@ -939,7 +969,7 @@ class BuiltInFunctions {
     divider.movq("%rdx", "%rbx");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(2, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -970,7 +1000,7 @@ class BuiltInFunctions {
     intBeq.label("intBeq_end");
     // mise en mémoire du résultat
     intBeq.movq(16, "%rdi");
-    intBeq.call("my_malloc");
+    intBeq.allignedFramecall("malloc");
     intBeq.movq(1, "(%rax)");
     intBeq.movq("%rbx", "8(%rax)");
 
@@ -993,7 +1023,7 @@ class BuiltInFunctions {
     // intBeq.label("intBeq_end");
     // // mise en mémoire du résultat
     // intBeq.movq(16, "%rdi");
-    // intBeq.call("my_malloc");
+    // intBeq.allignedFramecall("malloc");
     // intBeq.movq(1, "(%rax)");
     // intBeq.movq("%rbx", "8(%rax)");
 
@@ -1016,7 +1046,7 @@ class BuiltInFunctions {
     divider.label("Bge_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -1039,7 +1069,7 @@ class BuiltInFunctions {
     divider.label("Bgt_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -1062,7 +1092,7 @@ class BuiltInFunctions {
     divider.label("Ble_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -1085,7 +1115,7 @@ class BuiltInFunctions {
     divider.label("Blt_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
@@ -1111,7 +1141,7 @@ class BuiltInFunctions {
     divider.label("Band_end");
     // mise en mémoire du résultat
     divider.movq(16, "%rdi");
-    divider.call("my_malloc");
+    divider.allignedFramecall("malloc");
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 

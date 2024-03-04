@@ -108,11 +108,15 @@ public class X86_64 {
   }
 
   X86_64 subq(int n, String op) {
-    return subq("$"+n, op);
+    return subq("$" + n, op);
   }
 
   X86_64 imulq(String op1, String op2) {
     return emit("imulq " + op1 + ", " + op2);
+  }
+
+  X86_64 imulq(int n, String op) {
+    return imulq("$" + n, op);
   }
 
   X86_64 idivq(String op) {
@@ -180,11 +184,17 @@ public class X86_64 {
   }
 
   X86_64 framecall(String s) {
-    emit("pushq %rbp");
-    emit("movq %rsp, %rbp");
-    emit("call " + s);
-    emit("movq %rbp, %rsp");
-    return emit("popq %rbp");
+    pushq("%rbp");
+    movq("%rsp", "%rbp");
+    call(s);
+    movq("%rbp", "%rsp");
+    return popq("%rbp");
+  }
+
+  X86_64 allignedFramecall(String s) {
+    addq(-16, "%rsp"); // 16-byte stack alignment
+    framecall(s);
+    return addq(16, "%rsp"); // 16-byte stack alignment
   }
 
   X86_64 callstar(String op) {

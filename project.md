@@ -67,3 +67,5 @@ bash ./test -v2 ./minipython
 
 
 TODO : global variables need to be passed to every sub stack frame
+
+TODO in print, not correct allocation of regs => recursion [row, row] is not permited...
