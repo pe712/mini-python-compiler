@@ -174,8 +174,11 @@ class Compiler implements TVisitor {
             asm.framecall("Bmul");
             break;
           case Bneq:
+          // TODO
             break;
           case Bsub:
+            asm.negq("8(%rbx)");
+            asm.call("Badd");
             break;
           default:
         }
@@ -978,9 +981,16 @@ class BuiltInFunctions {
   }
 
   private static X86_64 Beq() {
+    X86_64 boolEq = new X86_64();
+    boolEq.movq("8(%rbx)", "%rbx");
+    boolEq.andq("8(%rax)", "%rbx");
+    boolEq.merge(BuiltInFunctions.allocateTCbool());
+    boolEq.movq("%rbx", "8(%rax)");
+
+
     X86_64 Beq = new X86_64();
     Beq.label("Beq");
-    Beq.merge(switchType("Beq", new X86_64(), new X86_64(), intBeq(), stringBeq(), new X86_64()));
+    Beq.merge(switchType("Beq",  new X86_64(), boolEq, intBeq(), stringBeq(), new X86_64()));
     Beq.ret();
     return Beq;
   }

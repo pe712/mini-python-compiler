@@ -801,7 +801,7 @@ class TDef {
       variable.ofs = -offset * 8;
       offset++;
     }
-    offset = 1;
+    offset = 2;
     for (Variable param : f.params) {
       param.ofs = offset * 8;
       offset++;
