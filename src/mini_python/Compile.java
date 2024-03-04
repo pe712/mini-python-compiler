@@ -109,15 +109,16 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
-    switch (e.op) { // besoin de faire un premier cas particulier pour respecter la "flemme" des opérateurs or et and
+    switch (e.op) { // besoin de faire un premier cas particulier pour respecter la "flemme" des
+                    // opérateurs or et and
       case Band:
         e.e1.accept(this);
         asm.framecall("bool");
-        asm.cmpq(0,"8(%rax)");
+        asm.cmpq(0, "8(%rax)");
         asm.je("Band_false_" + e.hashCode());
         e.e2.accept(this);
         asm.framecall("bool");
-        asm.cmpq(0,"8(%rax)");
+        asm.cmpq(0, "8(%rax)");
         asm.je("Band_false_" + e.hashCode());
         asm.movq(1, "%r8");
         asm.jmp("Band_end_" + e.hashCode());
@@ -135,11 +136,11 @@ class Compiler implements TVisitor {
       case Bor:
         e.e1.accept(this);
         asm.framecall("bool");
-        asm.cmpq(1,"8(%rax)");
+        asm.cmpq(1, "8(%rax)");
         asm.je("Bor_true_" + e.hashCode());
         e.e2.accept(this);
         asm.framecall("bool");
-        asm.cmpq(1,"8(%rax)");
+        asm.cmpq(1, "8(%rax)");
         asm.je("Bor_true_" + e.hashCode());
         asm.movq(0, "%r8");
         asm.jmp("Bor_end_" + e.hashCode());
@@ -155,43 +156,43 @@ class Compiler implements TVisitor {
         asm.movq("%r8", "8(%rax)");
         break;
       default:
-      e.e2.accept(this);
-      asm.movq("%rax", "%rbx");
-      e.e1.accept(this);
-      switch (e.op) {
-        case Badd:
-          asm.framecall("add");
-          break;
-        case Bdiv:
-          asm.framecall("div");
-          break;
-        case Beq:
-          asm.framecall("Beq");
-          break;
-        case Bge:
-          asm.framecall("Bge");
-          break;
-        case Bgt:
-          asm.framecall("Bgt");
-          break;
-        case Ble:
-          asm.framecall("Ble");
-          break;
-        case Blt:
-          asm.framecall("Blt");
-          break;
-        case Bmod:
-          asm.framecall("mod");
-          break;
-        case Bmul:
-          asm.framecall("mul");
-          break;
-        case Bneq:
-          break;
-        case Bsub:
-          break;
-      }
-      break;
+        e.e2.accept(this);
+        asm.movq("%rax", "%rbx");
+        e.e1.accept(this);
+        switch (e.op) {
+          case Badd:
+            asm.framecall("add");
+            break;
+          case Bdiv:
+            asm.framecall("div");
+            break;
+          case Beq:
+            asm.framecall("Beq");
+            break;
+          case Bge:
+            asm.framecall("Bge");
+            break;
+          case Bgt:
+            asm.framecall("Bgt");
+            break;
+          case Ble:
+            asm.framecall("Ble");
+            break;
+          case Blt:
+            asm.framecall("Blt");
+            break;
+          case Bmod:
+            asm.framecall("mod");
+            break;
+          case Bmul:
+            asm.framecall("mul");
+            break;
+          case Bneq:
+            break;
+          case Bsub:
+            break;
+        }
+        break;
     }
   }
 
@@ -205,8 +206,8 @@ class Compiler implements TVisitor {
         break;
       case Unot:
         throw new UnsupportedOperationException("Unimplemented method 'visit(TEunop Unot)'");
-        // break;
-    }    
+      // break;
+    }
   }
 
   @Override
@@ -247,7 +248,7 @@ class Compiler implements TVisitor {
     asm.movq(1, "%rdi"); // Operation not permitted
     asm.framecall("exit");
     asm.label("get_bon_" + e.hashCode());
-    asm.addq(16,"%rax");
+    asm.addq(16, "%rax");
     asm.movq("(%rax,%rbx,8)", "%rax");
   }
 
@@ -310,7 +311,7 @@ class Compiler implements TVisitor {
     asm.movq(2, "(%rax)");
     asm.movq("%r12", "8(%rax)");
     asm.movq("%rax", "(%r13,%r12,8)");
-    asm.addq(1,"%r12");
+    asm.addq(1, "%r12");
     asm.jmp("range_loop_" + e.hashCode());
 
     asm.label("end_range_" + e.hashCode());
@@ -330,7 +331,7 @@ class Compiler implements TVisitor {
     asm.cmpq(0, "8(%rax)");
     asm.je("else_" + uniqueTsifId);
     s.s1.accept(this);
-    asm.jmp("end_"+uniqueTsifId);
+    asm.jmp("end_" + uniqueTsifId);
     asm.label("else_" + uniqueTsifId);
     s.s2.accept(this);
     asm.label("end_" + uniqueTsifId);
@@ -384,7 +385,7 @@ class Compiler implements TVisitor {
     asm.label("for_loop_" + s.hashCode());
     asm.cmpq(0, "%r12");
     asm.je("end_for_" + s.hashCode());
-    asm.addq(8,"%r14");
+    asm.addq(8, "%r14");
     asm.movq("(%r14)", "%rax");
     asm.movq("%rax", s.x.ofs + "(%rbp)");
     s.s.accept(this);
@@ -404,7 +405,7 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSset s) {
     s.e1.accept(this);
-    asm.label("e1_"+s.hashCode());
+    asm.label("e1_" + s.hashCode());
     asm.pushq("%rax");
     s.e2.accept(this);
     asm.label("e2_" + s.hashCode());
@@ -446,11 +447,11 @@ class BuiltInFunctions {
   }
 
   /*
-   * L'implémentation du détail des erreurs à runtime n'est pas obligatoire 
-   * donc pour éviter de mettre des fausses erreurs, 
+   * L'implémentation du détail des erreurs à runtime n'est pas obligatoire
+   * donc pour éviter de mettre des fausses erreurs,
    * j'ai déclaré cette erreur qu'on peut utiliser n'importe où
    */
-  private static X86_64 error(){
+  private static X86_64 error() {
     X86_64 error = new X86_64();
     error.dlabel("Global_Error");
     error.string("Error\n");
@@ -458,7 +459,8 @@ class BuiltInFunctions {
   }
 
   /*
-   * La fameuse fonction len qui prend dans %rax une liste et qui renvoit sa longueur dans %rax
+   * La fameuse fonction len qui prend dans %rax une liste et qui renvoit sa
+   * longueur dans %rax
    */
   private static X86_64 len() {
     X86_64 len = new X86_64();
@@ -1096,11 +1098,11 @@ class BuiltInFunctions {
     divider.label("Band");
     // calcul du résulat
     divider.framecall("bool");
-    divider.cmpq(0,"8(%rax)");
+    divider.cmpq(0, "8(%rax)");
     divider.je("Band_false");
     divider.movq("%rbx", "%rax");
     divider.framecall("bool");
-    divider.cmpq(0,"8(%rax)");
+    divider.cmpq(0, "8(%rax)");
     divider.je("Band_false");
     divider.movq(1, "%rbx");
     divider.jmp("Band_end");

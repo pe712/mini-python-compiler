@@ -5,6 +5,7 @@ questions.md
 test.s
 test_exe
 out
+*.out
 exec/*.s
 exec-fail/*.s
 fichier
