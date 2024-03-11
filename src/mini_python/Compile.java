@@ -215,7 +215,7 @@ class Compiler implements TVisitor {
     Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
     while (backArgsIterator.hasNext()) {
       backArgsIterator.next().accept(this);
-      asm.call("copy"); // make a copy of each argument to pass by value
+      asm.framecall("copy"); // make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
     // return address is pushed on the stack by call
@@ -555,9 +555,9 @@ class BuiltInFunctions {
 
     // copy n*8 bytes + 16
     X86_64 copyList = new X86_64();
-    copyString.movq("8(%rax)", "%r12"); // n = size in bytes
-    copyString.imulq(8, "%r12");
-    copyString.addq(16, "%r12");
+    copyList.movq("8(%rax)", "%r12"); // n = size in bytes
+    copyList.imulq(8, "%r12");
+    copyList.addq(16, "%r12");
 
     X86_64 copier = new X86_64();
     copier.label("copy");
