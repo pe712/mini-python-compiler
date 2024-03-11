@@ -174,7 +174,11 @@ class Compiler implements TVisitor {
             asm.framecall("Bmul");
             break;
           case Bneq:
-          // TODO
+            asm.framecall("Beq");
+            asm.cmpq(1, "8(%rax)");
+            asm.movq(0, "%rbx");
+            asm.setnz("%bl");
+            asm.movq("%rbx", "8(%rax)");
             break;
           case Bsub:
             asm.negq("8(%rbx)");
