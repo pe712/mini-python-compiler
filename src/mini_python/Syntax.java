@@ -110,6 +110,22 @@ abstract class Expr {
   abstract void accept(Visitor v);
 }
 
+/*
+ * parameter wrapper to cope for optional parameters
+ * For actual parameter, ident can be null
+ * For formal parameter, expr can be null (it is the default expr)
+ */
+
+class Parameter {
+  final Expr expr;
+  final Ident ident;
+
+  public Parameter(Expr expr, Ident ident) {
+    this.expr = expr;
+    this.ident = ident;
+  }
+}
+
 class Ecst extends Expr {
   final Constant c;
 
