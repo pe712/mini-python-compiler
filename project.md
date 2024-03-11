@@ -59,13 +59,43 @@ f-string and .format and %s
  - dict 
 
 
-useful commands:
+# useful commands:
 
 make && gcc -g test.s -o test_exe && ./test_exe
 
 bash ./test -v2 ./minipython
 
 
-TODO : global variables need to be passed to every sub stack frame
+TODO : global variables need to be passed to every sub stack frame => remove global variable
 
 TODO in print, not correct allocation of regs => recursion [row, row] is not permited...
+
+1. registers checking
+2. Binop autres à implem
+3. copy in for loop
+for x in l:
+4. hashCode for user-defined func names
+5. implement Beq with Nones
+
+
+optional args
+1. reconnaissance lexer des syntaxes de def et de call 
+optionels toujours à la fin dans les deux cas
+def f(a, b=4, c=5, d=a==2):
+f(4, b=3)
+2. syntax:
+modifier DEF introduire une linkedList<Ident> 
+transformer LinkedList<Parameter>
+FormalParameter Ident + expr potentiellement null
+
+dans la def ex 4, 5, a==1
+modifier Ecall
+  final LinkedList<Expr> l;
+change to :
+  final LinkedList<Parameter> l;
+
+3. typing
+visit(Ecall e) 
+compter correctement les arguments 
+et passer les bonne TExpr => soit les actual params soit les valeurs par défaut
+
