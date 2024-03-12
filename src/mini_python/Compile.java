@@ -370,6 +370,7 @@ class Compiler implements TVisitor {
     asm.call("exit");
 
     asm.label("for_list_" + s.hashCode());
+    asm.framecall("copy");
     asm.pushq("%r12");
     asm.pushq("%r14");
     asm.movq("8(%rax)", "%r12"); // size
@@ -564,7 +565,7 @@ class BuiltInFunctions {
     copyString.movq("8(%rax)", "%r12"); // n = size in bytes
     copyString.addq(17, "%r12");
 
-    // copy n*8 bytes + 16
+    // copy n*8 bytes + 16 and recurse
     X86_64 copyList = new X86_64();
     copyList.movq("8(%rax)", "%r12"); // n = size in bytes
     copyList.imulq(8, "%r12");
