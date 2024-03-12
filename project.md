@@ -73,12 +73,18 @@ TODO : global variables need to be passed to every sub stack frame => remove glo
 TODO in print, not correct allocation of regs => recursion [row, row] is not permited...
 
 1. registers checking
-2. Binop autres à implem
+2. Binop autres à implem DONE
 3. copy in for loop
 for x in l:
-4. hashCode for user-defined func names
-5. implement Beq with Nones
+4. hashCode for user-defined func names todo for len DONE
+5. implement Beq with Nones DONE
 
+Rapport :
+=> parler de la formulation en sous bouts de code 
+=> parler du choix des registres en particulier des conventions non respectées
+=> du hashcode pour eviter les labels identiques
+=> parler de la construction switchType
+=> parler de strcmp qui renvoie sur 32 bits
 
 optional args
 1. reconnaissance lexer des syntaxes de def et de call 

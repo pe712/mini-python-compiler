@@ -41,7 +41,8 @@ class Typing {
           params.add(variable);
       }
 
-      typerVisitor.functions.put(name, new Function(name, new LinkedList<Variable>(params)));
+      typerVisitor.functions.put(name,
+          new Function(name + Math.abs(name.hashCode()), new LinkedList<Variable>(params)));
     }
 
     // Now we can start running the visitor
