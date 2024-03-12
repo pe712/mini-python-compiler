@@ -183,18 +183,26 @@ public class X86_64 {
     return emit("call " + s);
   }
 
-  X86_64 framecall(String s) {
+  X86_64 allignedFramecall(String s) {
+    addq(-16, "%rsp"); // 16-byte stack alignment
     pushq("%rbp");
     movq("%rsp", "%rbp");
     call(s);
     movq("%rbp", "%rsp");
-    return popq("%rbp");
+    popq("%rbp");
+    return addq(16, "%rsp"); // 16-byte stack alignment
   }
 
-  X86_64 allignedFramecall(String s) {
-    addq(-16, "%rsp"); // 16-byte stack alignment
-    framecall(s);
-    return addq(16, "%rsp"); // 16-byte stack alignment
+  X86_64 initFrame(String s) {
+    label(s);
+    pushq("%rbp");
+    return movq("%rsp", "%rbp");
+  }
+
+  X86_64 retFrame() {
+    movq("%rbp", "%rsp");
+    popq("%rbp");
+    return ret();
   }
 
   X86_64 callstar(String op) {

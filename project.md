@@ -107,3 +107,29 @@ visit(Ecall e)
 compter correctement les arguments 
 et passer les bonne TExpr => soit les actual params soit les valeurs par défaut
 
+correct way to do framecall
+
+_start:
+    ; Set up the stack frame
+    mov rbp, rsp
+
+    ; Call a subroutine
+    call my_subroutine
+
+    ; Clean up and exit
+    mov rax, 60         ; syscall number for exit
+    xor rdi, rdi        ; exit code 0
+    syscall
+
+my_subroutine:
+    ; Set up the stack frame
+    push rbp
+    mov rbp, rsp
+
+    ; Subroutine code here
+    ; Access local variables using [rbp - offset]
+
+    ; Clean up and return
+    mov rsp, rbp
+    pop rbp
+    ret

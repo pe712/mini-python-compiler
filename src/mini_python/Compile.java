@@ -38,13 +38,13 @@ class Compiler implements TVisitor {
   }
 
   public void visit(TDef tDef) {
+    String name;
     if (tDef.f.name.equals("__main__")) {
-      asm.label("main");
+      name = "main";
     } else
-      asm.label(tDef.f.name);
-
-    asm.movq("%rsp", "%rbp");
-    asm.addq(tDef.localVariables.size() * 8, "%rsp");
+      name = tDef.f.name;
+    asm.initFrame(name);
+    asm.subq(tDef.localVariables.size() * 8, "%rsp");
     tDef.body.accept(this);
   }
 
@@ -99,11 +99,11 @@ class Compiler implements TVisitor {
                     // opérateurs or et and
       case Band:
         e.e1.accept(this);
-        asm.framecall("bool");
+        asm.call("bool");
         asm.cmpq(0, "8(%rax)");
         asm.je("Band_false_" + e.hashCode());
         e.e2.accept(this);
-        asm.framecall("bool");
+        asm.call("bool");
         asm.cmpq(0, "8(%rax)");
         asm.je("Band_false_" + e.hashCode());
         asm.movq(1, "%r8");
@@ -121,11 +121,11 @@ class Compiler implements TVisitor {
         break;
       case Bor:
         e.e1.accept(this);
-        asm.framecall("bool");
+        asm.call("bool");
         asm.cmpq(1, "8(%rax)");
         asm.je("Bor_true_" + e.hashCode());
         e.e2.accept(this);
-        asm.framecall("bool");
+        asm.call("bool");
         asm.cmpq(1, "8(%rax)");
         asm.je("Bor_true_" + e.hashCode());
         asm.movq(0, "%r8");
@@ -147,34 +147,34 @@ class Compiler implements TVisitor {
         e.e1.accept(this);
         switch (e.op) {
           case Badd:
-            asm.framecall("Badd");
+            asm.call("Badd");
             break;
           case Bdiv:
-            asm.framecall("Bdiv");
+            asm.call("Bdiv");
             break;
           case Beq:
-            asm.framecall("Beq");
+            asm.call("Beq");
             break;
           case Bge:
-            asm.framecall("Bge");
+            asm.call("Bge");
             break;
           case Bgt:
-            asm.framecall("Bgt");
+            asm.call("Bgt");
             break;
           case Ble:
-            asm.framecall("Ble");
+            asm.call("Ble");
             break;
           case Blt:
-            asm.framecall("Blt");
+            asm.call("Blt");
             break;
           case Bmod:
-            asm.framecall("Bmod");
+            asm.call("Bmod");
             break;
           case Bmul:
-            asm.framecall("Bmul");
+            asm.call("Bmul");
             break;
           case Bneq:
-            asm.framecall("Bneq");
+            asm.call("Bneq");
             break;
           case Bsub:
             asm.negq("8(%rbx)");
@@ -195,7 +195,7 @@ class Compiler implements TVisitor {
         asm.negq("8(%rax)");
         break;
       case Unot:
-        asm.framecall("Unot");
+        asm.call("Unot");
         break;
     }
   }
@@ -211,10 +211,10 @@ class Compiler implements TVisitor {
     Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
     while (backArgsIterator.hasNext()) {
       backArgsIterator.next().accept(this);
-      asm.framecall("copy"); // make a copy of each argument to pass by value
+      asm.call("copy"); // make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
-    asm.framecall(e.f.name);
+    asm.call(e.f.name);
     for (int i = 0; i < e.l.size(); i++) {
       asm.popq("%rsi"); // reallign the stack but do not erase rax
     }
@@ -318,7 +318,7 @@ class Compiler implements TVisitor {
   public void visit(TSif s) {
     int uniqueTsifId = s.hashCode();
     s.e.accept(this);
-    asm.framecall("bool");
+    asm.call("bool");
     asm.cmpq(0, "8(%rax)");
     asm.je("else_" + uniqueTsifId);
     s.s1.accept(this);
@@ -331,8 +331,7 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSreturn s) {
     s.e.accept(this);
-    asm.movq("%rbp", "%rsp");
-    asm.ret();
+    asm.retFrame();
   }
 
   @Override
@@ -345,7 +344,7 @@ class Compiler implements TVisitor {
   public void visit(TSprint s) {
     s.e.accept(this);
     asm.movq(0, "%rsi"); // end with a newline
-    asm.framecall("print");
+    asm.call("print");
   }
 
   @Override
@@ -368,7 +367,7 @@ class Compiler implements TVisitor {
     asm.call("exit");
 
     asm.label("for_list_" + s.hashCode());
-    asm.framecall("copy");
+    asm.call("copy");
     asm.pushq("%r12");
     asm.pushq("%r14");
     asm.movq("8(%rax)", "%r12"); // size
@@ -408,7 +407,7 @@ class Compiler implements TVisitor {
     asm.movq("%rax", "%rdx");
     asm.popq("%rsi");
     asm.popq("%rdi");
-    asm.framecall("set");
+    asm.call("set");
   }
 
 }
@@ -444,13 +443,13 @@ class BuiltInFunctions {
   /* expects in %rax */
   private static X86_64 Unot() {
     X86_64 asm = new X86_64();
-    asm.label("Unot");
-    asm.framecall("bool");
+    asm.initFrame("Unot");
+    asm.call("bool");
     asm.movq(0, "%rsi");
     asm.cmpq(1, "8(%rax)");
     asm.setnz("%sil");
     asm.movq("%rsi", "8(%rax)");
-    asm.ret();
+    asm.retFrame();
     return asm;
   }
 
@@ -472,7 +471,7 @@ class BuiltInFunctions {
    */
   private static X86_64 len() {
     X86_64 len = new X86_64();
-    len.label("len");
+    len.initFrame("len");
     len.movq("8(%rbp)", "%rax");
     // len.movq("(%r8)", "%rax");
     len.cmpq(4, "(%rax)");
@@ -492,7 +491,7 @@ class BuiltInFunctions {
     len.movq(2, "(%rax)");
     len.popq("%r8");
     len.movq("%r8", "8(%rax)");
-    len.ret();
+    len.retFrame();
 
     return len;
   }
@@ -502,7 +501,7 @@ class BuiltInFunctions {
    */
   private static X86_64 bool() {
     X86_64 toBool = new X86_64();
-    toBool.label("bool");
+    toBool.initFrame("bool");
     toBool.pushq("%rax");
     toBool.merge(allocateTCbool());
     toBool.popq("%rsi"); // pointer to the value
@@ -513,7 +512,7 @@ class BuiltInFunctions {
     toBool.label("bool_false");
     toBool.movq(0, "8(%rax)");
     toBool.label("bool_end");
-    toBool.ret();
+    toBool.retFrame();
     return toBool;
   }
 
@@ -587,7 +586,7 @@ class BuiltInFunctions {
     copyList.pushq("%r12");
     copyList.pushq("%r11");
     copyList.movq("(%rax)", "%rax");
-    copyList.framecall("copy");
+    copyList.call("copy");
     copyList.popq("%r11");
     copyList.popq("%r12");
     copyList.popq("%rbx");
@@ -601,10 +600,10 @@ class BuiltInFunctions {
     copyList.cmpq(0, "%r12");
     copyList.jnz("copyList_loop");
     copyList.movq("%r11", "%rax");
-    copyList.ret();
+    copyList.retFrame();
 
     X86_64 copier = new X86_64();
-    copier.label("copy");
+    copier.initFrame("copy");
     copier.merge(switchType("copy", allocateTCnone(), copyLong, copyLong, copyString, copyList));
     copier.movq("%rax", "%rbx");
     copier.movq("%r12", "%rdi");
@@ -613,7 +612,7 @@ class BuiltInFunctions {
     copier.movq("%rax", "%rdi"); // dst
     copier.movq("%r12", "%rdx");
     copier.allignedFramecall("memcpy");
-    copier.ret();
+    copier.retFrame();
     return copier;
   }
 
@@ -637,12 +636,12 @@ class BuiltInFunctions {
     effectiveSetter.movq("8(%rax)", "%rax"); // offset
     effectiveSetter.addq("%rax", "%rdi"); // address to set
     effectiveSetter.movq("%rdx", "(%rdi)"); // store the value
-    effectiveSetter.ret();
+    effectiveSetter.retFrame();
 
     X86_64 setter = new X86_64();
     setter.dlabel("TSset_TypeError_index");
     setter.string("TypeError: list indices must be integers\n");
-    setter.label("set");
+    setter.initFrame("set");
     setter.movq("%rsi", "%rax"); // for switch on type of index
     setter.merge(switchType("set", error, error, effectiveSetter, error, error));
     return setter;
@@ -684,7 +683,7 @@ class BuiltInFunctions {
    */
   private static X86_64 print() {
     X86_64 printer = new X86_64();
-    printer.label("print");
+    printer.initFrame("print");
     printer.merge(switchType("print", printNone(), printBool(), printInt(), printString(), printList()));
     return printer;
   }
@@ -698,7 +697,7 @@ class BuiltInFunctions {
     newliner.dlabel("newline");
     newliner.string("\n");
 
-    newliner.label("print_newline");
+    newliner.initFrame("print_newline");
     newliner.cmpq(0, "%rsi");
     newliner.jne("print_newline_end");
     newliner.movq("$string_format", "%rdi");
@@ -706,7 +705,7 @@ class BuiltInFunctions {
     newliner.movq(0, "%rax");
     newliner.allignedFramecall("printf");
     newliner.label("print_newline_end");
-    newliner.ret();
+    newliner.retFrame();
     return newliner;
   }
 
@@ -722,8 +721,8 @@ class BuiltInFunctions {
     asm.movq(0, "%rax");
     asm.allignedFramecall("printf");
     asm.popq("%rsi");
-    asm.framecall("print_newline");
-    asm.ret();
+    asm.call("print_newline");
+    asm.retFrame();
     return asm;
   }
 
@@ -751,9 +750,9 @@ class BuiltInFunctions {
     asm.allignedFramecall("printf");
 
     asm.popq("%rsi");
-    asm.framecall("print_newline");
+    asm.call("print_newline");
 
-    asm.ret();
+    asm.retFrame();
     return asm;
   }
 
@@ -768,8 +767,8 @@ class BuiltInFunctions {
     asm.movq(0, "%rax");
     asm.allignedFramecall("printf");
     asm.popq("%rsi");
-    asm.framecall("print_newline");
-    asm.ret();
+    asm.call("print_newline");
+    asm.retFrame();
     return asm;
   }
 
@@ -824,7 +823,7 @@ class BuiltInFunctions {
     asm.pushq("%r8");
     asm.pushq("%r10");
     asm.movq(1, "%rsi"); // no endline
-    asm.framecall("print");
+    asm.call("print");
     asm.popq("%r10");
     asm.jmp("printList_loop");
 
@@ -834,8 +833,8 @@ class BuiltInFunctions {
     asm.movq(0, "%rax");
     asm.allignedFramecall("printf");
     asm.popq("%rsi");
-    asm.framecall("print_newline");
-    asm.ret();
+    asm.call("print_newline");
+    asm.retFrame();
     return asm;
 
   }
@@ -852,8 +851,8 @@ class BuiltInFunctions {
     asm.movq(0, "%rax");
     asm.allignedFramecall("printf");
     asm.popq("%rsi");
-    asm.framecall("print_newline");
-    asm.ret();
+    asm.call("print_newline");
+    asm.retFrame();
     return asm;
   }
 
@@ -863,9 +862,9 @@ class BuiltInFunctions {
    */
   private static X86_64 Badd() {
     X86_64 adder = new X86_64();
-    adder.label("Badd");
+    adder.initFrame("Badd");
     adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
-    adder.ret();
+    adder.retFrame();
     return adder;
   }
 
@@ -977,7 +976,7 @@ class BuiltInFunctions {
    */
   private static X86_64 Bmul() {
     X86_64 multiplicater = new X86_64();
-    multiplicater.label("Bmul");
+    multiplicater.initFrame("Bmul");
     // calcul du résulat
     multiplicater.movq("8(%rbx)", "%rbx");
     multiplicater.movq("8(%rax)", "%r8");
@@ -988,13 +987,13 @@ class BuiltInFunctions {
     multiplicater.movq(2, "(%rax)");
     multiplicater.movq("%rbx", "8(%rax)");
 
-    multiplicater.ret();
+    multiplicater.retFrame();
     return multiplicater;
   }
 
   private static X86_64 Bdiv() {
     X86_64 divider = new X86_64();
-    divider.label("Bdiv");
+    divider.initFrame("Bdiv");
     // calcul du résulat
     divider.movq("8(%rbx)", "%rbx");
     divider.movq("8(%rax)", "%rax");
@@ -1006,13 +1005,13 @@ class BuiltInFunctions {
     divider.movq(2, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
-    divider.ret();
+    divider.retFrame();
     return divider;
   }
 
   private static X86_64 Bmod() {
     X86_64 divider = new X86_64();
-    divider.label("Bmod");
+    divider.initFrame("Bmod");
     // calcul du résulat
     divider.movq("8(%rbx)", "%rbx");
     divider.movq("8(%rax)", "%rax");
@@ -1024,16 +1023,16 @@ class BuiltInFunctions {
     divider.movq(2, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
-    divider.ret();
+    divider.retFrame();
     return divider;
   }
 
   private static X86_64 Bneq() {
     X86_64 asm = new X86_64();
-    asm.label("Bneq");
-    asm.framecall("Beq");
-    asm.framecall("Unot");
-    asm.ret();
+    asm.initFrame("Bneq");
+    asm.call("Beq");
+    asm.call("Unot");
+    asm.retFrame();
     return asm;
   }
 
@@ -1056,7 +1055,7 @@ class BuiltInFunctions {
     stringBeq.label("stringBeq_return");
     stringBeq.merge(BuiltInFunctions.allocateTCbool());
     stringBeq.movq("%rbx", "8(%rax)");
-    stringBeq.ret();
+    stringBeq.retFrame();
 
     // assert rbx of type None
     X86_64 noneBeq = new X86_64();
@@ -1065,7 +1064,7 @@ class BuiltInFunctions {
     noneBeq.setz("%bl");
     noneBeq.merge(BuiltInFunctions.allocateTCbool());
     noneBeq.movq("%rbx", "8(%rax)");
-    noneBeq.ret();
+    noneBeq.retFrame();
 
     // assert rbx of type list
     X86_64 listBeq = new X86_64();
@@ -1096,7 +1095,7 @@ class BuiltInFunctions {
     listBeq.pushq("%r11");
     listBeq.movq("(%rax)", "%rax");
     listBeq.movq("(%rbx)", "%rbx");
-    listBeq.framecall("Beq");
+    listBeq.call("Beq");
     listBeq.movq("%rax", "%rsi"); // result = TCbool
     listBeq.popq("%r11");
     listBeq.popq("%rbx");
@@ -1114,10 +1113,10 @@ class BuiltInFunctions {
     listBeq.label("listBeq_return");
     listBeq.merge(BuiltInFunctions.allocateTCbool());
     listBeq.movq("%rbx", "8(%rax)");
-    listBeq.ret();
+    listBeq.retFrame();
 
     X86_64 Beq = new X86_64();
-    Beq.label("Beq");
+    Beq.initFrame("Beq");
     Beq.merge(switchType("Beq", noneBeq, BoolIntEq("bool"), BoolIntEq("int"), stringBeq, listBeq));
     return Beq;
   }
@@ -1141,25 +1140,25 @@ class BuiltInFunctions {
     boolEq.label(label + "Beq_return");
     boolEq.merge(BuiltInFunctions.allocateTCbool());
     boolEq.movq("%rbx", "8(%rax)");
-    boolEq.ret();
+    boolEq.retFrame();
     return boolEq;
   }
 
   private static X86_64 Bge() {
     X86_64 asm = new X86_64();
-    asm.label("Bge");
+    asm.initFrame("Bge");
     asm.pushq("%rax");
     asm.pushq("%rbx");
-    asm.framecall("Bgt");
+    asm.call("Bgt");
     asm.popq("%rdi"); // rbx
     asm.popq("%rsi"); // rax
     asm.cmpq(1, "8(%rax)");
     asm.jz("endBge");
     asm.movq("%rsi", "%rax");
     asm.movq("%rdi", "%rbx");
-    asm.framecall("Beq");
+    asm.call("Beq");
     asm.label("endBge");
-    asm.ret();
+    asm.retFrame();
     return asm;
   }
 
@@ -1179,7 +1178,7 @@ class BuiltInFunctions {
     stringGt.label("stringGt_return");
     stringGt.merge(BuiltInFunctions.allocateTCbool());
     stringGt.movq("%rbx", "8(%rax)");
-    stringGt.ret();
+    stringGt.retFrame();
 
     // assert rbx of type list
     X86_64 listBgt = new X86_64();
@@ -1209,7 +1208,7 @@ class BuiltInFunctions {
     listBgt.pushq("%r12");
     listBgt.movq("(%rax)", "%rax");
     listBgt.movq("(%rbx)", "%rbx");
-    listBgt.framecall("Bgt");
+    listBgt.call("Bgt");
     listBgt.movq("%rax", "%rsi"); // result = TCbool
     listBgt.popq("%r12");
     listBgt.popq("%r11");
@@ -1233,10 +1232,10 @@ class BuiltInFunctions {
     listBgt.label("listBgt_return");
     listBgt.merge(BuiltInFunctions.allocateTCbool());
     listBgt.movq("%rbx", "8(%rax)");
-    listBgt.ret();
+    listBgt.retFrame();
 
     X86_64 Bgt = new X86_64();
-    Bgt.label("Bgt");
+    Bgt.initFrame("Bgt");
     Bgt.merge(switchType("Bgt", new X86_64(), BoolIntGt("bool"), BoolIntGt("int"), stringGt, listBgt));
     return Bgt;
   }
@@ -1258,37 +1257,37 @@ class BuiltInFunctions {
     boolintGt.label(label + "Bgt_return");
     boolintGt.merge(BuiltInFunctions.allocateTCbool());
     boolintGt.movq("%rbx", "8(%rax)");
-    boolintGt.ret();
+    boolintGt.retFrame();
     return boolintGt;
   }
 
   private static X86_64 Ble() {
     X86_64 asm = new X86_64();
-    asm.label("Ble");
-    asm.framecall("Bgt");
-    asm.framecall("Unot");
-    asm.ret();
+    asm.initFrame("Ble");
+    asm.call("Bgt");
+    asm.call("Unot");
+    asm.retFrame();
     return asm;
   }
 
   private static X86_64 Blt() {
     X86_64 asm = new X86_64();
-    asm.label("Blt");
-    asm.framecall("Bge");
-    asm.framecall("Unot");
-    asm.ret();
+    asm.initFrame("Blt");
+    asm.call("Bge");
+    asm.call("Unot");
+    asm.retFrame();
     return asm;
   }
 
   private static X86_64 Band() {
     X86_64 divider = new X86_64();
-    divider.label("Band");
+    divider.initFrame("Band");
     // calcul du résulat
-    divider.framecall("bool");
+    divider.call("bool");
     divider.cmpq(0, "8(%rax)");
     divider.je("Band_false");
     divider.movq("%rbx", "%rax");
-    divider.framecall("bool");
+    divider.call("bool");
     divider.cmpq(0, "8(%rax)");
     divider.je("Band_false");
     divider.movq(1, "%rbx");
@@ -1302,7 +1301,7 @@ class BuiltInFunctions {
     divider.movq(1, "(%rax)");
     divider.movq("%rbx", "8(%rax)");
 
-    divider.ret();
+    divider.retFrame();
     return divider;
   }
 
