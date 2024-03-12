@@ -61,7 +61,9 @@ f-string and .format and %s
 
 # useful commands:
 
-make && gcc -g test.s -o test_exe && ./test_exe
+make && gcc -g -m64 test.s -o test_exe && ./test_exe
+
+=> even with -m64 flag, strcmp returns a 32 bits signed integer (long) !!
 
 bash ./test -v2 ./minipython
 

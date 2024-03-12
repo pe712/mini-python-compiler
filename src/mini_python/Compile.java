@@ -174,11 +174,7 @@ class Compiler implements TVisitor {
             asm.framecall("Bmul");
             break;
           case Bneq:
-            asm.framecall("Beq");
-            asm.cmpq(1, "8(%rax)");
-            asm.movq(0, "%rbx");
-            asm.setnz("%bl");
-            asm.movq("%rbx", "8(%rax)");
+            asm.framecall("Bneq");
             break;
           case Bsub:
             asm.negq("8(%rbx)");
@@ -199,8 +195,8 @@ class Compiler implements TVisitor {
         asm.negq("8(%rax)");
         break;
       case Unot:
-        throw new UnsupportedOperationException("Unimplemented method 'visit(TEunop Unot)'");
-      // break;
+        asm.framecall("Unot");
+        break;
     }
   }
 
@@ -431,17 +427,32 @@ class BuiltInFunctions {
     functions.add(Bdiv());
     functions.add(Bmod());
     functions.add(Beq());
+    functions.add(Bneq());
     functions.add(Bge());
     functions.add(Bgt());
     functions.add(Ble());
     functions.add(Blt());
     functions.add(Band());
+    functions.add(Unot());
     functions.add(set());
     functions.add(bool());
     functions.add(error());
     functions.add(len());
     functions.add(copy());
     return functions;
+  }
+
+  /* expects in %rax */
+  private static X86_64 Unot() {
+    X86_64 asm = new X86_64();
+    asm.label("Unot");
+    asm.framecall("bool");
+    asm.movq(0, "%rsi");
+    asm.cmpq(1, "8(%rax)");
+    asm.setnz("%sil");
+    asm.movq("%rsi", "8(%rax)");
+    asm.ret();
+    return asm;
   }
 
   /*
@@ -984,17 +995,25 @@ class BuiltInFunctions {
     return divider;
   }
 
+  private static X86_64 Bneq() {
+    X86_64 asm = new X86_64();
+    asm.label("Bneq");
+    asm.framecall("Beq");
+    asm.framecall("Unot");
+    asm.ret();
+    return asm;
+  }
+
   private static X86_64 Beq() {
-    X86_64 boolEq = new X86_64();
-    boolEq.movq("8(%rbx)", "%rbx");
-    boolEq.cmpq("8(%rax)", "%rbx");
-    boolEq.movq(0, "%rbx");
-    boolEq.setnz("%bl");
-    boolEq.merge(BuiltInFunctions.allocateTCbool());
-    boolEq.movq("%rbx", "8(%rax)");
-    boolEq.ret();
-  
+
+    // assert rbx of type string and strings are equal
     X86_64 stringBeq = new X86_64();
+    stringBeq.cmpq(3, "(%rbx)");
+    stringBeq.jz("stringBeq");
+    stringBeq.movq(0, "%rbx");
+    stringBeq.setz("%bl");
+    stringBeq.jmp("stringBeq_return");
+
     stringBeq.label("stringBeq");
     stringBeq.leaq("16(%rax)", "%rsi");
     stringBeq.leaq("16(%rbx)", "%rdi");
@@ -1002,108 +1021,133 @@ class BuiltInFunctions {
     stringBeq.movq(0, "%rbx");
     stringBeq.cmpq(0, "%rax");
     stringBeq.setz("%bl");
+    stringBeq.label("stringBeq_return");
     stringBeq.merge(BuiltInFunctions.allocateTCbool());
     stringBeq.movq("%rbx", "8(%rax)");
     stringBeq.ret();
 
+    // assert rbx of type None
+    X86_64 noneBeq = new X86_64();
+    noneBeq.cmpq(0, "(%rax)");
+    noneBeq.movq(0, "%rbx");
+    noneBeq.setz("%bl");
+    noneBeq.merge(BuiltInFunctions.allocateTCbool());
+    noneBeq.movq("%rbx", "8(%rax)");
+    noneBeq.ret();
 
     X86_64 Beq = new X86_64();
     Beq.label("Beq");
-    Beq.merge(switchType("Beq",  new X86_64(), boolEq, boolEq, stringBeq, new X86_64()));
+    Beq.merge(switchType("Beq", noneBeq, BoolIntEq("bool"), BoolIntEq("int"), stringBeq, new X86_64()));
     return Beq;
   }
 
+  private static X86_64 BoolIntEq(String label) {
+    // assert rbx of type int or bool
+    X86_64 boolEq = new X86_64();
+    boolEq.cmpq(1, "(%rbx)");
+    boolEq.jz(label + "Beq");
+    boolEq.cmpq(2, "(%rbx)");
+    boolEq.jz(label + "Beq");
+    boolEq.movq(0, "%rbx");
+    boolEq.setz("%bl");
+    boolEq.jmp(label + "Beq_return");
+
+    boolEq.label(label + "Beq");
+    boolEq.movq("8(%rbx)", "%rbx");
+    boolEq.cmpq("8(%rax)", "%rbx");
+    boolEq.movq(0, "%rbx");
+    boolEq.setz("%bl");
+    boolEq.label(label + "Beq_return");
+    boolEq.merge(BuiltInFunctions.allocateTCbool());
+    boolEq.movq("%rbx", "8(%rax)");
+    boolEq.ret();
+    return boolEq;
+  }
 
   private static X86_64 Bge() {
-    X86_64 divider = new X86_64();
-    divider.label("Bge");
-    // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.jge("Bge_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Bge_end");
-    divider.label("Bge_true");
-    divider.movq(1, "%rbx");
-    divider.label("Bge_end");
-    // mise en mémoire du résultat
-    divider.movq(16, "%rdi");
-    divider.allignedFramecall("malloc");
-    divider.movq(1, "(%rax)");
-    divider.movq("%rbx", "8(%rax)");
-
-    divider.ret();
-    return divider;
+    X86_64 asm = new X86_64();
+    asm.label("Bge");
+    asm.pushq("%rax");
+    asm.pushq("%rbx");
+    asm.framecall("Bgt");
+    asm.popq("%rdi"); // rbx
+    asm.popq("%rsi"); // rax
+    asm.cmpq(1, "8(%rax)");
+    asm.jz("endBge");
+    asm.movq("%rsi", "%rax");
+    asm.movq("%rdi", "%rbx");
+    asm.framecall("Beq");
+    asm.label("endBge");
+    asm.ret();
+    return asm;
   }
 
   private static X86_64 Bgt() {
-    X86_64 divider = new X86_64();
-    divider.label("Bgt");
-    // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.jg("Bgt_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Bgt_end");
-    divider.label("Bgt_true");
-    divider.movq(1, "%rbx");
-    divider.label("Bgt_end");
-    // mise en mémoire du résultat
-    divider.movq(16, "%rdi");
-    divider.allignedFramecall("malloc");
-    divider.movq(1, "(%rax)");
-    divider.movq("%rbx", "8(%rax)");
+    // assert rbx of type string and strings are equal
+    X86_64 stringGt = new X86_64();
+    stringGt.cmpq(3, "(%rbx)");
+    stringGt.jz("stringGt");
+    stringGt.movq(0, "%rbx");
+    stringGt.setz("%bl");
+    stringGt.jmp("stringGt_return");
 
-    divider.ret();
-    return divider;
+    stringGt.label("stringGt");
+    stringGt.leaq("16(%rax)", "%rsi");
+    stringGt.leaq("16(%rbx)", "%rdi");
+    stringGt.allignedFramecall("strcmp");
+    stringGt.movq(0, "%rbx");
+    stringGt.cmpl(0, "%eax");
+    stringGt.setl("%bl");
+    stringGt.label("stringGt_return");
+    stringGt.merge(BuiltInFunctions.allocateTCbool());
+    stringGt.movq("%rbx", "8(%rax)");
+    stringGt.ret();
+
+    X86_64 Bgt = new X86_64();
+    Bgt.label("Bgt");
+    Bgt.merge(switchType("Bgt", new X86_64(), BoolIntGt("bool"), BoolIntGt("int"), stringGt, new X86_64()));
+    return Bgt;
+  }
+
+  private static X86_64 BoolIntGt(String label) {
+    // assert rbx of type int or bool
+    X86_64 boolintGt = new X86_64();
+    boolintGt.cmpq(1, "(%rbx)");
+    boolintGt.jz(label + "Bgt");
+    boolintGt.cmpq(2, "(%rbx)");
+    boolintGt.jz(label + "Bgt");
+    boolintGt.movq(0, "%rbx");
+    boolintGt.setz("%bl");
+    boolintGt.jmp(label + "Bgt_return");
+
+    boolintGt.label(label + "Bgt");
+    boolintGt.movq("8(%rbx)", "%rbx");
+    boolintGt.subq("8(%rax)", "%rbx");
+    boolintGt.movq(0, "%rbx");
+    boolintGt.setl("%bl");
+    boolintGt.label(label + "Bgt_return");
+    boolintGt.merge(BuiltInFunctions.allocateTCbool());
+    boolintGt.movq("%rbx", "8(%rax)");
+    boolintGt.ret();
+    return boolintGt;
   }
 
   private static X86_64 Ble() {
-    X86_64 divider = new X86_64();
-    divider.label("Ble");
-    // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.jle("Ble_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Ble_end");
-    divider.label("Ble_true");
-    divider.movq(1, "%rbx");
-    divider.label("Ble_end");
-    // mise en mémoire du résultat
-    divider.movq(16, "%rdi");
-    divider.allignedFramecall("malloc");
-    divider.movq(1, "(%rax)");
-    divider.movq("%rbx", "8(%rax)");
-
-    divider.ret();
-    return divider;
+    X86_64 asm = new X86_64();
+    asm.label("Ble");
+    asm.framecall("Bgt");
+    asm.framecall("Unot");
+    asm.ret();
+    return asm;
   }
 
   private static X86_64 Blt() {
-    X86_64 divider = new X86_64();
-    divider.label("Blt");
-    // calcul du résulat
-    divider.movq("8(%rbx)", "%rbx");
-    divider.movq("8(%rax)", "%rax");
-    divider.cmpq("%rbx", "%rax");
-    divider.jl("Blt_true");
-    divider.movq(0, "%rbx");
-    divider.jmp("Blt_end");
-    divider.label("Blt_true");
-    divider.movq(1, "%rbx");
-    divider.label("Blt_end");
-    // mise en mémoire du résultat
-    divider.movq(16, "%rdi");
-    divider.allignedFramecall("malloc");
-    divider.movq(1, "(%rax)");
-    divider.movq("%rbx", "8(%rax)");
-
-    divider.ret();
-    return divider;
+    X86_64 asm = new X86_64();
+    asm.label("Blt");
+    asm.framecall("Bge");
+    asm.framecall("Unot");
+    asm.ret();
+    return asm;
   }
 
   private static X86_64 Band() {
