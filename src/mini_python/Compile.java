@@ -859,9 +859,47 @@ class BuiltInFunctions {
    * result in %rax
    */
   private static X86_64 Badd() {
+    X86_64 listAdd = new X86_64();
+    listAdd.movq("8(%rax)", "%r12"); // n1
+    listAdd.movq("8(%rbx)", "%r13"); // n2
+    
+    listAdd.movq("%r12","%r14");
+    listAdd.addq("%r13", "%r14"); //n 
+    
+    listAdd.imulq(8, "%r12");
+    listAdd.imulq(8, "%r13");
+
+    listAdd.movq("%r13", "%rdi");
+    listAdd.addq("%r12", "%rdi");
+    listAdd.addq(16, "%rdi"); // size in bytes to allocate
+    
+    listAdd.addq(16, "%rax");
+    listAdd.addq(16, "%rbx");
+
+    listAdd.pushq("%rax");
+    listAdd.allignedFramecall("malloc");
+
+    listAdd.movq(4, "(%rax)");
+    listAdd.movq("%r14", "8(%rax)");
+    listAdd.movq("%rax", "%r14"); // save base pointer
+
+    listAdd.popq("%rsi"); // src
+    listAdd.addq(16, "%rax");
+    listAdd.movq("%rax", "%rdi"); // dst
+    listAdd.movq("%r12", "%rdx"); // size to copy
+    listAdd.allignedFramecall("memcpy");
+
+    listAdd.addq("%r12", "%rax");
+    listAdd.movq("%rbx", "%rsi"); // src
+    listAdd.movq("%rax", "%rdi"); // dst
+    listAdd.movq("%r13", "%rdx"); // size to copy
+    listAdd.allignedFramecall("memcpy");
+
+    listAdd.movq("%r14", "%rax");
+
     X86_64 adder = new X86_64();
     adder.initFrame("Badd");
-    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), new X86_64()));
+    adder.merge(switchType("Badd", new X86_64(), new X86_64(), intAdd(), stringAdd(), listAdd));
     adder.retFrame();
     return adder;
   }
