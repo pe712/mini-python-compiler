@@ -1011,7 +1011,6 @@ class BuiltInFunctions {
     stringBeq.cmpq(3, "(%rbx)");
     stringBeq.jz("stringBeq");
     stringBeq.movq(0, "%rbx");
-    stringBeq.setz("%bl");
     stringBeq.jmp("stringBeq_return");
 
     stringBeq.label("stringBeq");
@@ -1028,16 +1027,65 @@ class BuiltInFunctions {
 
     // assert rbx of type None
     X86_64 noneBeq = new X86_64();
-    noneBeq.cmpq(0, "(%rax)");
+    noneBeq.cmpq(0, "(%rbx)");
     noneBeq.movq(0, "%rbx");
     noneBeq.setz("%bl");
     noneBeq.merge(BuiltInFunctions.allocateTCbool());
     noneBeq.movq("%rbx", "8(%rax)");
     noneBeq.ret();
 
+    // assert rbx of type list 
+    X86_64 listBeq = new X86_64();
+    listBeq.cmpq(4, "(%rbx)");
+    listBeq.jz("listBeq_length");
+    listBeq.movq(0, "%rbx");
+    listBeq.jmp("listBeq_return");
+
+    // assert same length
+    listBeq.label("listBeq_length");
+    listBeq.addq(8, "%rax");
+    listBeq.addq(8, "%rbx");
+    listBeq.movq("(%rax)", "%r11"); // n
+    listBeq.cmpq("%r11", "(%rbx)");
+    listBeq.jz("listBeq_loop");
+    listBeq.movq(0, "%rbx");
+    listBeq.jmp("listBeq_return");
+
+    // for each element ensure that they are equal, if not return
+    listBeq.label("listBeq_loop");
+    listBeq.cmpq(0, "%r11");
+    listBeq.jz("listBeq_true");
+
+    listBeq.addq(8, "%rax");
+    listBeq.addq(8, "%rbx");
+    listBeq.pushq("%rax");
+    listBeq.pushq("%rbx");
+    listBeq.pushq("%r11");
+    listBeq.movq("(%rax)", "%rax");
+    listBeq.movq("(%rbx)", "%rbx");
+    listBeq.framecall("Beq");
+    listBeq.movq("%rax", "%rsi"); //result = TCbool
+    listBeq.popq("%r11");
+    listBeq.popq("%rbx");
+    listBeq.popq("%rax");
+    listBeq.decq("%r11"); // counter
+
+    listBeq.cmpq(1, "8(%rsi)");
+    listBeq.jz("listBeq_loop");
+    listBeq.movq(0, "%rbx");
+    listBeq.jmp("listBeq_return");
+
+    listBeq.label("listBeq_true");
+    listBeq.movq(1, "%rbx");
+
+    listBeq.label("listBeq_return");
+    listBeq.merge(BuiltInFunctions.allocateTCbool());
+    listBeq.movq("%rbx", "8(%rax)");
+    listBeq.ret();
+
     X86_64 Beq = new X86_64();
     Beq.label("Beq");
-    Beq.merge(switchType("Beq", noneBeq, BoolIntEq("bool"), BoolIntEq("int"), stringBeq, new X86_64()));
+    Beq.merge(switchType("Beq", noneBeq, BoolIntEq("bool"), BoolIntEq("int"), stringBeq, listBeq));
     return Beq;
   }
 
@@ -1083,13 +1131,10 @@ class BuiltInFunctions {
   }
 
   private static X86_64 Bgt() {
-    // assert rbx of type string and strings are equal
     X86_64 stringGt = new X86_64();
     stringGt.cmpq(3, "(%rbx)");
     stringGt.jz("stringGt");
-    stringGt.movq(0, "%rbx");
-    stringGt.setz("%bl");
-    stringGt.jmp("stringGt_return");
+    // TODO: raise error
 
     stringGt.label("stringGt");
     stringGt.leaq("16(%rax)", "%rsi");
@@ -1103,9 +1148,65 @@ class BuiltInFunctions {
     stringGt.movq("%rbx", "8(%rax)");
     stringGt.ret();
 
+    // assert rbx of type list 
+    X86_64 listBgt = new X86_64();
+    listBgt.cmpq(4, "(%rbx)");
+    listBgt.jz("listBgt");
+    // TODO: raise error
+
+    // assert same length
+    listBgt.label("listBgt");
+    listBgt.addq(8, "%rax");
+    listBgt.addq(8, "%rbx");
+    listBgt.movq("(%rax)", "%r11"); // n1
+    listBgt.movq("(%rbx)", "%r12"); // n2
+
+    // for each element compare if strict return
+    listBgt.label("listBgt_loop");
+    listBgt.cmpq(0, "%r11");
+    listBgt.jz("listBgt_false");
+    listBgt.cmpq(0, "%r12");
+    listBgt.jz("listBgt_true");
+
+    listBgt.addq(8, "%rax");
+    listBgt.addq(8, "%rbx");
+    listBgt.pushq("%rax");
+    listBgt.pushq("%rbx");
+    listBgt.pushq("%r11");
+    listBgt.pushq("%r12");
+    listBgt.movq("(%rax)", "%rax");
+    listBgt.movq("(%rbx)", "%rbx");
+    listBgt.framecall("Bgt");
+    listBgt.movq("%rax", "%rsi"); //result = TCbool
+    listBgt.popq("%r12");
+    listBgt.popq("%r11");
+    listBgt.popq("%rbx");
+    listBgt.popq("%rax");
+    listBgt.decq("%r12"); // counter
+    listBgt.decq("%r11"); // counter
+
+    listBgt.cmpq(0, "8(%rsi)");
+    listBgt.jz("listBgt_loop");
+    listBgt.cmpq(1, "8(%rsi)");
+    listBgt.jz("listBgt_true");
+
+    listBgt.label("listBgt_false");
+    listBgt.movq(0, "%rbx");
+    listBgt.jmp("listBgt_return");
+    
+    listBgt.label("listBgt_true");
+    listBgt.movq(1, "%rbx");
+
+
+
+    listBgt.label("listBgt_return");
+    listBgt.merge(BuiltInFunctions.allocateTCbool());
+    listBgt.movq("%rbx", "8(%rax)");
+    listBgt.ret();
+
     X86_64 Bgt = new X86_64();
     Bgt.label("Bgt");
-    Bgt.merge(switchType("Bgt", new X86_64(), BoolIntGt("bool"), BoolIntGt("int"), stringGt, new X86_64()));
+    Bgt.merge(switchType("Bgt", new X86_64(), BoolIntGt("bool"), BoolIntGt("int"), stringGt, listBgt));
     return Bgt;
   }
 
@@ -1116,9 +1217,7 @@ class BuiltInFunctions {
     boolintGt.jz(label + "Bgt");
     boolintGt.cmpq(2, "(%rbx)");
     boolintGt.jz(label + "Bgt");
-    boolintGt.movq(0, "%rbx");
-    boolintGt.setz("%bl");
-    boolintGt.jmp(label + "Bgt_return");
+    // TODO: raise error
 
     boolintGt.label(label + "Bgt");
     boolintGt.movq("8(%rbx)", "%rbx");
