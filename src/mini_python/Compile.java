@@ -397,13 +397,10 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TSset s) {
     s.e1.accept(this);
-    asm.label("e1_" + s.hashCode());
     asm.pushq("%rax");
     s.e2.accept(this);
-    asm.label("e2_" + s.hashCode());
     asm.pushq("%rax");
     s.e3.accept(this);
-    asm.label("e3_" + s.hashCode());
     asm.movq("%rax", "%rdx");
     asm.popq("%rsi");
     asm.popq("%rdi");
@@ -634,6 +631,7 @@ class BuiltInFunctions {
     // %rdx = value adress
     effectiveSetter.addq(16, "%rdi"); // first elmt
     effectiveSetter.movq("8(%rax)", "%rax"); // offset
+    effectiveSetter.imulq(8, "%rax");
     effectiveSetter.addq("%rax", "%rdi"); // address to set
     effectiveSetter.movq("%rdx", "(%rdi)"); // store the value
     effectiveSetter.retFrame();
