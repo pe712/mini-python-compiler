@@ -214,8 +214,6 @@ class Compiler implements TVisitor {
       asm.framecall("copy"); // make a copy of each argument to pass by value
       asm.pushq("%rax");
     }
-    // return address is pushed on the stack by call
-    // asm.pushq("%rbp");
     asm.framecall(e.f.name);
     for (int i = 0; i < e.l.size(); i++) {
       asm.popq("%rsi"); // reallign the stack but do not erase rax
@@ -575,10 +573,10 @@ class BuiltInFunctions {
     copyList.pushq("%rax");
     copyList.allignedFramecall("malloc");
     copyList.movq("%rax", "%rbx"); // new list space
-    copyList.movq("%rbx", "%r11"); //saved list pointer
+    copyList.movq("%rbx", "%r11"); // saved list pointer
     copyList.popq("%rax");
-  
-    copyList.movq(4, "(%rbx)"); //type
+
+    copyList.movq(4, "(%rbx)"); // type
     copyList.movq("%r12", "8(%rbx)"); // n
     copyList.addq(16, "%rax");
     copyList.addq(16, "%rbx");
@@ -595,7 +593,7 @@ class BuiltInFunctions {
     copyList.popq("%rbx");
     copyList.movq("%rax", "(%rbx)"); // copied element address
     copyList.popq("%rax");
-    
+
     copyList.decq("%r12"); // counter
     copyList.addq(8, "%rax");
     copyList.addq(8, "%rbx");
@@ -1069,7 +1067,7 @@ class BuiltInFunctions {
     noneBeq.movq("%rbx", "8(%rax)");
     noneBeq.ret();
 
-    // assert rbx of type list 
+    // assert rbx of type list
     X86_64 listBeq = new X86_64();
     listBeq.cmpq(4, "(%rbx)");
     listBeq.jz("listBeq_length");
@@ -1099,7 +1097,7 @@ class BuiltInFunctions {
     listBeq.movq("(%rax)", "%rax");
     listBeq.movq("(%rbx)", "%rbx");
     listBeq.framecall("Beq");
-    listBeq.movq("%rax", "%rsi"); //result = TCbool
+    listBeq.movq("%rax", "%rsi"); // result = TCbool
     listBeq.popq("%r11");
     listBeq.popq("%rbx");
     listBeq.popq("%rax");
@@ -1183,7 +1181,7 @@ class BuiltInFunctions {
     stringGt.movq("%rbx", "8(%rax)");
     stringGt.ret();
 
-    // assert rbx of type list 
+    // assert rbx of type list
     X86_64 listBgt = new X86_64();
     listBgt.cmpq(4, "(%rbx)");
     listBgt.jz("listBgt");
@@ -1212,7 +1210,7 @@ class BuiltInFunctions {
     listBgt.movq("(%rax)", "%rax");
     listBgt.movq("(%rbx)", "%rbx");
     listBgt.framecall("Bgt");
-    listBgt.movq("%rax", "%rsi"); //result = TCbool
+    listBgt.movq("%rax", "%rsi"); // result = TCbool
     listBgt.popq("%r12");
     listBgt.popq("%r11");
     listBgt.popq("%rbx");
@@ -1228,11 +1226,9 @@ class BuiltInFunctions {
     listBgt.label("listBgt_false");
     listBgt.movq(0, "%rbx");
     listBgt.jmp("listBgt_return");
-    
+
     listBgt.label("listBgt_true");
     listBgt.movq(1, "%rbx");
-
-
 
     listBgt.label("listBgt_return");
     listBgt.merge(BuiltInFunctions.allocateTCbool());
