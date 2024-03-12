@@ -568,8 +568,42 @@ class BuiltInFunctions {
     // copy n*8 bytes + 16 and recurse
     X86_64 copyList = new X86_64();
     copyList.movq("8(%rax)", "%r12"); // n = size in bytes
-    copyList.imulq(8, "%r12");
-    copyList.addq(16, "%r12");
+    copyList.movq("%r12", "%rdi");
+    copyList.imulq(8, "%rdi");
+    copyList.addq(16, "%rdi");
+
+    copyList.pushq("%rax");
+    copyList.allignedFramecall("malloc");
+    copyList.movq("%rax", "%rbx"); // new list space
+    copyList.movq("%rbx", "%r11"); //saved list pointer
+    copyList.popq("%rax");
+  
+    copyList.movq(4, "(%rbx)"); //type
+    copyList.movq("%r12", "8(%rbx)"); // n
+    copyList.addq(16, "%rax");
+    copyList.addq(16, "%rbx");
+
+    copyList.label("copyList_loop");
+    copyList.pushq("%rax");
+    copyList.pushq("%rbx");
+    copyList.pushq("%r12");
+    copyList.pushq("%r11");
+    copyList.movq("(%rax)", "%rax");
+    copyList.framecall("copy");
+    copyList.popq("%r11");
+    copyList.popq("%r12");
+    copyList.popq("%rbx");
+    copyList.movq("%rax", "(%rbx)"); // copied element address
+    copyList.popq("%rax");
+    
+    copyList.decq("%r12"); // counter
+    copyList.addq(8, "%rax");
+    copyList.addq(8, "%rbx");
+
+    copyList.cmpq(0, "%r12");
+    copyList.jnz("copyList_loop");
+    copyList.movq("%r11", "%rax");
+    copyList.ret();
 
     X86_64 copier = new X86_64();
     copier.label("copy");
