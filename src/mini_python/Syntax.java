@@ -124,6 +124,11 @@ class Parameter {
     this.expr = expr;
     this.ident = ident;
   }
+
+  public void accept(Visitor v) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'accept'");
+  }
 }
 
 class Ecst extends Expr {
@@ -203,9 +208,9 @@ class Eget extends Expr {
 
 class Ecall extends Expr {
   final Ident f;
-  final LinkedList<Expr> l;
+  final LinkedList<Parameter> l;
 
-  Ecall(Ident f, LinkedList<Expr> l) {
+  Ecall(Ident f, LinkedList<Parameter> l) {
     super();
     this.f = f;
     this.l = l;
@@ -368,10 +373,10 @@ class Sset extends Stmt {
 
 class Def {
   final Ident f;
-  final LinkedList<Ident> l; // formal parameters
+  final LinkedList<Parameter> l; // formal parameters
   final Stmt s;
 
-  Def(Ident f, LinkedList<Ident> l, Stmt s) {
+  Def(Ident f, LinkedList<Parameter> l, Stmt s) {
     super();
     this.f = f;
     this.l = l;

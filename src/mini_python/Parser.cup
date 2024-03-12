@@ -16,7 +16,8 @@ non terminal Def def;
 non terminal opt_newline;
 non terminal LinkedList<Def> list_def;
 non terminal LinkedList<Stmt> list_stmt, nonempty_list_stmt;
-non terminal LinkedList<Ident> list_comma_ident, nonempty_list_comma_ident;
+non terminal LinkedList<Parameter> list_comma_param, list_comma_args;
+non terminal Parameter parameter, optional_parameter, argument;
 non terminal Stmt simple_stmt, stmt, suite;
 non terminal Expr expr;
 non terminal LinkedList<Expr> nonempty_list_comma_expr, list_comma_expr;
@@ -29,7 +30,7 @@ precedence left PLUS, MINUS;
 precedence left TIMES, DIV, MOD;
 precedence nonassoc UMINUS;
 precedence nonassoc LSQ;
-
+precedence left COMMA;
 start with file;
 
 file ::=
@@ -38,7 +39,7 @@ file ::=
 ;
 
 def ::=
-  DEF IDENT:f LP list_comma_ident:x RP COLON suite:s
+  DEF IDENT:f LP list_comma_param:x RP COLON suite:s
     {: RESULT = new Def(f, x, s); :}
 ;
 
@@ -101,7 +102,7 @@ expr ::=
     {: RESULT = new Ebinop(Binop.Band, e1, e2); :}
 | expr:e1 OR expr:e2
     {: RESULT = new Ebinop(Binop.Bor, e1, e2); :}
-| IDENT:f LP list_comma_expr:l RP
+| IDENT:f LP list_comma_args:l RP
     {: RESULT = new Ecall (f, l); :}
 | LSQ list_comma_expr:l RSQ
     {: RESULT = new Elist(l); :}
@@ -124,19 +125,57 @@ nonempty_list_comma_expr ::=
       l.add(x); RESULT = l; :}
 ;
 
-list_comma_ident ::=
-  nonempty_list_comma_ident:l
-   {: RESULT = l; :}
+list_comma_args::=
+    argument:x COMMA  list_comma_args:l
+   {: l.addFirst(x); RESULT = l; :}
+|    list_comma_args:l COMMA optional_parameter:x 
+   {: l.add(x); RESULT = l; :}
+|  optional_parameter:x
+   {:
+    LinkedList<Parameter> l = new LinkedList<Parameter>();
+    l.add(x); RESULT = l; 
+    :}
+|  argument:x
+   {:
+    LinkedList<Parameter> l = new LinkedList<Parameter>();
+    l.add(x); RESULT = l; 
+    :}
 |
-   {: RESULT = new LinkedList<Ident>(); :}
+   {: RESULT = new LinkedList<Parameter>(); :}
 ;
 
-nonempty_list_comma_ident ::=
-  IDENT:x COMMA nonempty_list_comma_ident:l
+list_comma_param ::=
+    parameter:x COMMA  list_comma_param:l
    {: l.addFirst(x); RESULT = l; :}
-| IDENT:x
-   {: LinkedList<Ident> l = new LinkedList<Ident>();
-      l.add(x); RESULT = l; :}
+|    list_comma_param:l COMMA optional_parameter:x 
+   {: l.add(x); RESULT = l; :}
+|  optional_parameter:x
+   {:
+    LinkedList<Parameter> l = new LinkedList<Parameter>();
+    l.add(x); RESULT = l; 
+    :}
+|  parameter:x
+   {:
+    LinkedList<Parameter> l = new LinkedList<Parameter>();
+    l.add(x); RESULT = l; 
+    :}
+|
+   {: RESULT = new LinkedList<Parameter>(); :}
+;
+
+optional_parameter ::=
+    IDENT:x EQUAL expr:e
+    {: RESULT = new Parameter(e, x); :}
+;
+
+parameter ::= 
+    IDENT:x
+    {: RESULT = new Parameter(null, x); :}
+;
+
+argument ::=
+    expr:e
+    {: RESULT = new Parameter(e, null); :}
 ;
 
 list_def ::=

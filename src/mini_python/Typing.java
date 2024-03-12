@@ -32,8 +32,8 @@ class Typing {
 
       LinkedHashSet<Variable> params = new LinkedHashSet<Variable>();
 
-      for (Ident param : def.l) {
-        String varName = param.id;
+      for (Parameter param : def.l) {
+        String varName = param.ident.id;
         Variable variable = Variable.mkVariable(varName);
         if (params.contains(variable))
           error(def.f.loc, "Formal parameters should be pairwise distincts");
@@ -156,8 +156,8 @@ class TyperVisitor implements Visitor {
 
     // get actual parameters
     LinkedList<TExpr> args = new LinkedList<TExpr>();
-    for (Expr expr : e.l) {
-      expr.accept(this);
+    for (Parameter param : e.l) {
+      param.accept(this);
       args.add(this.tExpr);
     }
 
