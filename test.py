@@ -1,10 +1,33 @@
-def str(i):
-    l = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-    if i < 10:
-        return l[i]
-    else:
-        return str(i // 10) + l[i % 10]
+def prefix(n, l):
+    r = list(range(n))
+    for i in r:
+        r[i] = l[i]
+    return r
 
-print(str(0))
-print(str(42))
-print(str(1024))
+def range2(n1, n2):
+    r = list(range(n2 - n1 + 1))
+    i = 0
+    for x in r:
+        r[i] = n1
+        n1 = n1 + 1
+        i = i + 1
+    return r
+
+def filter_out(p, l):
+    i = 0
+    for x in l:
+        if x > p and x % p == 0:
+            l[i] = 0
+        i = i + 1
+
+def primes(n):
+    l = range2(2, n)
+    nb = 0
+    for x in l:
+        if x > 0:
+            l[nb] = x
+            nb = nb + 1
+            filter_out(x, l)
+    return prefix(nb, l)
+
+print(primes(100))

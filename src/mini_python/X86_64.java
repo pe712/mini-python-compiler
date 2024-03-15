@@ -196,10 +196,12 @@ public class X86_64 {
   X86_64 initFrame(String s) {
     label(s);
     pushq("%rbp");
-    return movq("%rsp", "%rbp");
+    movq("%rsp", "%rbp");
+    return pushq("%rbx");
   }
 
   X86_64 retFrame() {
+    popq("%rbx");
     movq("%rbp", "%rsp");
     popq("%rbp");
     return ret();

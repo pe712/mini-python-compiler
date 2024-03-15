@@ -46,6 +46,9 @@ class Compiler implements TVisitor {
     asm.initFrame(name);
     asm.subq(tDef.localVariables.size() * 8, "%rsp");
     tDef.body.accept(this);
+    // if (tDef.f.name.equals("__main__")){}
+    // else
+      // asm.retFrame();
   }
 
   public void init() {
@@ -95,6 +98,8 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEbinop e) {
+    // asm.pushq("%rbx");
+    // asm.pushq("%r12");
     switch (e.op) { // besoin de faire un premier cas particulier pour respecter la "flemme" des
                     // opérateurs or et and
       case Band:
@@ -144,7 +149,9 @@ class Compiler implements TVisitor {
       default:
         e.e2.accept(this);
         asm.movq("%rax", "%rbx");
+        asm.pushq("%rbx");
         e.e1.accept(this);
+        asm.popq("%rbx");
         switch (e.op) {
           case Badd:
             asm.call("Badd");
@@ -184,6 +191,8 @@ class Compiler implements TVisitor {
         }
         break;
     }
+    // asm.popq("%rbx");
+    // asm.popq("%r12");
   }
 
   @Override
@@ -223,6 +232,7 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEget e) {
+    asm.pushq("%rbx");
     e.e1.accept(this);
     asm.pushq("%rax");
     e.e2.accept(this);
@@ -241,6 +251,7 @@ class Compiler implements TVisitor {
     asm.label("get_bon_" + e.hashCode());
     asm.addq(16, "%rax");
     asm.movq("(%rax,%rbx,8)", "%rax");
+    asm.popq("%rbx");
   }
 
   @Override
@@ -380,7 +391,9 @@ class Compiler implements TVisitor {
     asm.addq(8, "%r14");
     asm.movq("(%r14)", "%rax");
     asm.movq("%rax", s.x.ofs + "(%rbp)");
+    asm.pushq("%r12");
     s.s.accept(this);
+    asm.popq("%r12");
     asm.decq("%r12");
     asm.jmp("for_loop_" + s.hashCode());
 
