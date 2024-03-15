@@ -1,37 +1,30 @@
-def prefix(n, l):
-    r = list(range(n))
-    for i in r:
-        r[i] = l[i]
-    return r
+# triangle de Pascal modulo 7
 
-def range2(n1, n2):
-    r = list(range(n2 - n1 + 1))
-    i = 0
-    for x in r:
-        r[i] = n1
-        n1 = n1 + 1
-        i = i + 1
-    return r
+def print_row(r, i):
+    s = ""
+    for j in list(range(i+1)):
+        if r[j]:
+            s = "*" + s
+        else:
+            s = "0" + s
+    print(s)
 
-def filter_out(p, l):
-    i = 0
-    print("début de la boucle pour p = ")
-    print(p)
-    print(l)
-    for x in l:
-        if x > p and x % p == 0:
-            l[i] = 0
-        i = i + 1
-    print(l)
+def compute_row(r, j):
+    v = 0
+    if j == 0:
+        v = 1
+    else:
+        v = (r[j] + r[j-1]) % 7
+    r[j] = v
+    if j > 0: compute_row(r, j-1)
 
-def primes(n):
-    l = range2(2, n)
-    nb = 0
-    for x in l:
-        if x > 0:
-            l[nb] = x
-            nb = nb + 1
-            filter_out(x, l)
-    return prefix(nb, l)
+def main():
+    # h = 40
+    h = 10
+    r = list(range(h+1))
+    for i in list(range(h)):
+        r[i] = 0
+        compute_row(r, i)
+        print_row(r, i)
 
-print(primes(100))
+main ()

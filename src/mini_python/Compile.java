@@ -396,7 +396,9 @@ class Compiler implements TVisitor {
     asm.movq("(%r14)", "%rax");
     asm.movq("%rax", s.x.ofs + "(%rbp)");
     asm.pushq("%r12");
+    asm.pushq("%r14");
     s.s.accept(this);
+    asm.popq("%r14");
     asm.popq("%r12");
     asm.decq("%r12");
     asm.jmp("for_loop_" + s.hashCode());
