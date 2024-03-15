@@ -469,7 +469,7 @@ class BuiltInFunctions {
   private static X86_64 len() {
     X86_64 len = new X86_64();
     len.initFrame("len");
-    len.movq("8(%rbp)", "%rax");
+    len.movq("16(%rbp)", "%rax");
     // len.movq("(%r8)", "%rax");
     len.cmpq(4, "(%rax)");
     len.je("len_bon");
