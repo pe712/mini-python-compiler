@@ -15,10 +15,14 @@ def range2(n1, n2):
 
 def filter_out(p, l):
     i = 0
+    print("début de la boucle pour p = ")
+    print(p)
+    print(l)
     for x in l:
         if x > p and x % p == 0:
             l[i] = 0
         i = i + 1
+    print(l)
 
 def primes(n):
     l = range2(2, n)

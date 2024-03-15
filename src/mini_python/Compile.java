@@ -184,8 +184,7 @@ class Compiler implements TVisitor {
             asm.call("Bneq");
             break;
           case Bsub:
-            asm.negq("8(%rbx)");
-            asm.call("Badd");
+            asm.call("Bsub");
             break;
           default:
         }
@@ -216,11 +215,16 @@ class Compiler implements TVisitor {
 
   @Override
   public void visit(TEcall e) {
+    int tmp = 0;
     // load parameters on the stack
     Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
     while (backArgsIterator.hasNext()) {
+      tmp ++;
       backArgsIterator.next().accept(this);
+      asm.cmpq(4, "(%rax)");
+      asm.je("arg_list_" + e.hashCode() + "_" + tmp);
       asm.call("copy"); // make a copy of each argument to pass by value
+      asm.label("arg_list_" + e.hashCode() + "_" + tmp);
       asm.pushq("%rax");
     }
     asm.call(e.f.name);
@@ -378,7 +382,7 @@ class Compiler implements TVisitor {
     asm.call("exit");
 
     asm.label("for_list_" + s.hashCode());
-    asm.call("copy");
+    // asm.call("copy"); // En pratique il ne faut pas faire de copie de la liste 
     asm.pushq("%r12");
     asm.pushq("%r14");
     asm.movq("8(%rax)", "%r12"); // size
@@ -447,6 +451,7 @@ class BuiltInFunctions {
     functions.add(error());
     functions.add(len());
     functions.add(copy());
+    functions.add(Bsub());
     return functions;
   }
 
@@ -592,14 +597,14 @@ class BuiltInFunctions {
 
     copyList.label("copyList_loop");
     copyList.pushq("%rax");
-    copyList.pushq("%rbx");
-    copyList.pushq("%r12");
-    copyList.pushq("%r11");
+    // copyList.pushq("%rbx"); 
+    // copyList.pushq("%r12");
+    // copyList.pushq("%r11");
     copyList.movq("(%rax)", "%rax");
-    copyList.call("copy");
-    copyList.popq("%r11");
-    copyList.popq("%r12");
-    copyList.popq("%rbx");
+    // copyList.call("copy"); // à voir si les call sur les listes se font par référence
+    // copyList.popq("%r11");
+    // copyList.popq("%r12");
+    // copyList.popq("%rbx");
     copyList.movq("%rax", "(%rbx)"); // copied element address
     copyList.popq("%rax");
 
@@ -1352,6 +1357,48 @@ class BuiltInFunctions {
 
     divider.retFrame();
     return divider;
+  }
+
+    /*
+   * expect the two pointers in %rax and %rbx
+   * result in %rax
+   */
+  private static X86_64 Bsub() {
+    X86_64 adder = new X86_64();
+    adder.initFrame("Bsub");
+    adder.merge(switchType("Bsub", new X86_64(), new X86_64(), intSub(), new X86_64(), new X86_64()));
+    adder.retFrame();
+    return adder;
+  }
+
+  /*
+   * expect pointer to first int in %rbx and unknown pointer in %rax
+   */
+  private static X86_64 intSub() {
+    X86_64 intAddition = new X86_64();
+    intAddition.movq("8(%rbx)", "%rbx"); // first int in %rbx
+    intAddition.subq("8(%rax)", "%rbx"); // result in %rbx
+
+    intAddition.merge(BuiltInFunctions.allocateTCint());
+    intAddition.movq("%rbx", "8(%rax)"); // store result
+
+    X86_64 error = new X86_64();
+    error.movq("$string_format", "%rdi");
+    error.movq("$intAdd_TypeError", "%rsi");
+    error.movq(0, "%rax");
+    error.allignedFramecall("printf");
+    error.movq(1, "%rdi"); // Operation not permitted
+    error.call("exit");
+
+    X86_64 intSuber = new X86_64();
+    intSuber.dlabel("intSub_TypeError");
+    intSuber.string("TypeError: unsupported operand type(s) for +: 'int' and not 'int'\n");
+    // unknown type must be in %rax :
+    intSuber.movq("%rax", "%rsi"); // temporary
+    intSuber.movq("%rbx", "%rax");
+    intSuber.movq("%rsi", "%rbx");
+    intSuber.merge(switchType("intSub", error, error, intAddition, error, error));
+    return intSuber;
   }
 
 }
