@@ -18,7 +18,7 @@ class Typing {
 
     // First create every function
     // recursion + resolving variables + resolving to other func
-    Function main = new Function("__main__", new LinkedList<Variable>());
+    Function main = new Function("__main__", new LinkedList<TParameter>());
     typerVisitor.functions.put(main.name, main);
 
     for (Def def : file.l) {
@@ -30,19 +30,21 @@ class Typing {
       if (typerVisitor.functions.containsKey(name))
         error(def.f.loc, "The names of the functions declared with def should be distinct from each other.");
 
-      LinkedHashSet<Variable> params = new LinkedHashSet<Variable>();
+      LinkedHashSet<TParameter> params = new LinkedHashSet<TParameter>();
 
       for (Parameter param : def.l) {
         String varName = param.ident.id;
         Variable variable = Variable.mkVariable(varName);
         if (params.contains(variable))
           error(def.f.loc, "Formal parameters should be pairwise distincts");
-        else
-          params.add(variable);
+        else{
+          TParameter tparam = new TParameter(param.expr,variable);
+          params.add(tparam);
+        }
       }
 
       typerVisitor.functions.put(name,
-          new Function(name + Math.abs(name.hashCode()), new LinkedList<Variable>(params)));
+          new Function(name + Math.abs(name.hashCode()), new LinkedList<TParameter>(params)));
     }
 
     // Now we can start running the visitor
@@ -70,8 +72,8 @@ class TyperVisitor implements Visitor {
 
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
-    LinkedList<Variable> paramsLen = new LinkedList<Variable>();
-    paramsLen.add(Variable.mkVariable("l"));
+    LinkedList<TParameter> paramsLen = new LinkedList<TParameter>();
+    paramsLen.add( new TParameter(null,Variable.mkVariable("l")));
     len = new Function("len", paramsLen);
   }
 
@@ -150,15 +152,30 @@ class TyperVisitor implements Visitor {
       if (callee == null)
         Typing.error(e.f.loc, "Function is not defined");
       else if (callee.params.size() != e.l.size()) {
-        Typing.error(e.f.loc, "Bad arity");
+        // Typing.error(e.f.loc, "Bad arity");
       }
     }
 
     // get actual parameters
     LinkedList<TExpr> args = new LinkedList<TExpr>();
-    for (Parameter param : e.l) {
-      param.accept(this);
-      args.add(this.tExpr);
+    int i = 0;
+    Parameter p1;
+    for (TParameter param : callee.params) {
+      try {
+        p1 = e.l.get(i);
+      } catch (IndexOutOfBoundsException e1) {
+        p1 = null;
+      }
+      if (p1 != null && p1.ident == null ){
+        p1.expr.accept(this);
+        args.add(this.tExpr);
+      }
+      else{
+        param.expr.accept(this);
+        args.add(this.tExpr);
+      }
+      i++;
+      // TODO : Traiter l'arity ici parce que j'ai enlevé la vérification au dessus
     }
 
     if (Typing.isSpecialCall(name)) {
@@ -275,7 +292,8 @@ class TyperVisitor implements Visitor {
      * global variables (local of __main__)
      * local variables of the current Function
      */
-    for (Variable variable : this.currentFunction.params) {
+    for (TParameter tparam : this.currentFunction.params) {
+      Variable variable = tparam.var;
       if (variable.name.equals(ident.id))
         return variable;
     }

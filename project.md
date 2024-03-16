@@ -106,6 +106,7 @@ change to :
 visit(Ecall e) 
 compter correctement les arguments 
 et passer les bonne TExpr => soit les actual params soit les valeurs par défaut
+Définir les function avec une LinkedList<Parameter> plutôt que LinkedList<Variables>
 
 correct way to do framecall
 
