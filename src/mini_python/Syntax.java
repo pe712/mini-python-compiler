@@ -500,7 +500,7 @@ class Variable {
  * For formal parameter, expr can be null (it is the default expr)
  */
 
- class TParameter {
+class TParameter {
   final Expr expr;
   final Variable var;
 
@@ -510,7 +510,6 @@ class Variable {
   }
 
   public void accept(Visitor v) {
-    // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'accept'");
   }
 }
