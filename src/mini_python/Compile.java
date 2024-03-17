@@ -580,7 +580,7 @@ class BuiltInFunctions {
     copyString.movq("8(%rax)", "%r12"); // n = size in bytes
     copyString.addq(17, "%r12");
 
-    // copy n*8 bytes + 16 and recurse
+    // copy n*8 bytes + 16 and recurse => this is never used in practice, we never have to copy a list
     X86_64 copyList = new X86_64();
     copyList.movq("8(%rax)", "%r12"); // n = size in bytes
     copyList.movq("%r12", "%rdi");
