@@ -1,5 +1,5 @@
 def a():
-    print(x)
+    x = 6
 
 x=5
 a()
