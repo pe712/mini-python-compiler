@@ -27,8 +27,8 @@ ma_fonction("obligatoire", parametre_optionnel2="optionnel2", parametre_optionne
 
 # # Test 6 : Appel de la fonction avec un nombre incorrect de paramètres
 # # Cela doit générer une erreur TypeError
-print("Test 6")
-ma_fonction("obligatoire", paramètre_optionnel2 = "optionnel2", "optionnel1")
+# print("Test 6")
+# ma_fonction("obligatoire", paramètre_optionnel1 = "optionnel1")
 
 # # Test 7 : Appel de la fonction avec un nombre incorrect de paramètres
 # # Cela doit générer une erreur TypeError
