@@ -16,7 +16,7 @@ non terminal Def def;
 non terminal opt_newline;
 non terminal LinkedList<Def> list_def;
 non terminal LinkedList<Stmt> list_stmt, nonempty_list_stmt;
-non terminal LinkedList<Parameter> list_comma_param, list_comma_args;
+non terminal LinkedList<Parameter> nonempty_list_comma_args, nonempty_list_comma_param, list_comma_param, list_comma_args;
 non terminal Parameter parameter, optional_parameter, argument;
 non terminal Stmt simple_stmt, stmt, suite;
 non terminal Expr expr;
@@ -125,29 +125,41 @@ nonempty_list_comma_expr ::=
       l.add(x); RESULT = l; :}
 ;
 
-list_comma_args::=
-    argument:x COMMA  list_comma_args:l
+nonempty_list_comma_args::=
+    argument:x COMMA  nonempty_list_comma_args:l
    {: l.addFirst(x); RESULT = l; :}
-|    list_comma_args:l COMMA optional_parameter:x 
+|    nonempty_list_comma_args:l COMMA optional_parameter:x 
    {: l.add(x); RESULT = l; :}
 |  optional_parameter:x
-   {:
+    {:
     LinkedList<Parameter> l = new LinkedList<Parameter>();
     l.add(x); RESULT = l; 
     :}
 |  argument:x
-   {:
+    {:
     LinkedList<Parameter> l = new LinkedList<Parameter>();
     l.add(x); RESULT = l; 
     :}
+;
+
+list_comma_args::=
+    nonempty_list_comma_args:l
+   {: RESULT = l; :}
 |
    {: RESULT = new LinkedList<Parameter>(); :}
 ;
 
 list_comma_param ::=
-    parameter:x COMMA  list_comma_param:l
+    nonempty_list_comma_param:l
+   {: RESULT = l; :}
+|
+   {: RESULT = new LinkedList<Parameter>(); :}
+;
+
+nonempty_list_comma_param::=
+    parameter:x COMMA  nonempty_list_comma_param:l
    {: l.addFirst(x); RESULT = l; :}
-|    list_comma_param:l COMMA optional_parameter:x 
+|    nonempty_list_comma_param:l COMMA optional_parameter:x 
    {: l.add(x); RESULT = l; :}
 |  optional_parameter:x
    {:
@@ -159,10 +171,9 @@ list_comma_param ::=
     LinkedList<Parameter> l = new LinkedList<Parameter>();
     l.add(x); RESULT = l; 
     :}
-|
-   {: RESULT = new LinkedList<Parameter>(); :}
 ;
 
+// same as optional argument in terms of parsing
 optional_parameter ::=
     IDENT:x EQUAL expr:e
     {: RESULT = new Parameter(e, x); :}
