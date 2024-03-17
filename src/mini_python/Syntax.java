@@ -495,14 +495,34 @@ class Variable {
 }
 
 /*
+ * parameter wrapper to cope for optional parameters
+ * For actual parameter, ident can be null
+ * For formal parameter, expr can be null (it is the default expr)
+ */
+
+class TParameter {
+  final Expr expr;
+  final Variable var;
+
+  public TParameter(Expr expr, Variable var) {
+    this.expr = expr;
+    this.var = var;
+  }
+
+  public void accept(Visitor v) {
+    throw new UnsupportedOperationException("Unimplemented method 'accept'");
+  }
+}
+
+/*
  * Similarly, all the occurrences of a given function all point
  * to a single object of the following class.
  */
 class Function {
   final String name;
-  final LinkedList<Variable> params;
+  final LinkedList<TParameter> params;
 
-  Function(String name, LinkedList<Variable> params) {
+  Function(String name, LinkedList<TParameter> params) {
     this.name = name;
     this.params = params;
   }
@@ -823,8 +843,9 @@ class TDef {
       offset++;
     }
     offset = 2;
-    for (Variable param : f.params) {
-      param.ofs = offset * 8;
+    for (TParameter param : f.params) {
+      Variable variable = param.var;
+      variable.ofs = offset * 8;
       offset++;
     }
     // each value is a 8 bytes pointer to heap allocated data
