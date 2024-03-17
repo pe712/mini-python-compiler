@@ -7,7 +7,7 @@ BASH := bash
 all: src/mini_python/Lexer.java src/mini_python/parser.java
 	$(JAVAC) src/mini_python/*.java
 	$(PGM) test.py
-	$(GCC) -g test.s -o test_exe
+	$(GCC) -g -m64 test.s -o test_exe
 	./test_exe
 
 .PHONY: tests
