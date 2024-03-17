@@ -169,14 +169,17 @@ class TyperVisitor implements Visitor {
         if (e.l.size() > callee.params.size())
           Typing.error(e.f.loc, "Too many arguments");
         for (TParameter param : callee.params) {
-          // System.out.println(param.var.name);
           try {
             p1 = e.l.get(i);
           } catch (IndexOutOfBoundsException e1) {
             p1 = null;
           }
-          if (p1 == null && param.expr == null)
+          try {
+            if (p1 == null && param.expr == null)
+              Typing.error(e.f.loc, "Missing argument");
+          } catch (Error e1) {
             Typing.error(e.f.loc, "Missing argument");
+          }
           if (p1 != null && p1.ident == null) {
             if (keyword)
               Typing.error(e.f.loc, "Positional argument cannot appear after keyword arguments");
