@@ -14,14 +14,14 @@ test: all
 	$(GCC) -g -m64 test.s -o test_exe
 	./test_exe
 
-tests: all
+tests-3: all
 	$(BASH) ./test -v3 ./minipython
 
 tests-2: all
 	$(BASH) ./test -v2 ./minipython
 
 tests-1: all
-	$(BASH) ./test -v1 ./minipython
+	$(BASH) ./test -1 ./minipython
 
 # cup and jflex
 src/mini_python/parser.java src/mini_python/sym.java: src/mini_python/Parser.cup
