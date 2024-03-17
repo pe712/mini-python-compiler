@@ -158,25 +158,71 @@ class TyperVisitor implements Visitor {
 
     // get actual parameters
     LinkedList<TExpr> args = new LinkedList<TExpr>();
+    LinkedList<TExpr> mandatoryArgs = new LinkedList<TExpr>();
+    LinkedList<Parameter> explicitArgs = new LinkedList<Parameter>();
+    LinkedList<Parameter> otherArgs = new LinkedList<Parameter>();
+    LinkedList<TParameter> defaultArgs = new LinkedList<TParameter>();
     int i = 0;
     Parameter p1;
+    
+
     for (TParameter param : callee.params) {
+      defaultArgs.add(param);
       try {
         p1 = e.l.get(i);
       } catch (IndexOutOfBoundsException e1) {
         p1 = null;
       }
-      if (p1 != null && p1.ident == null ){
+      if (p1 != null && param.expr == null ){
         p1.expr.accept(this);
-        args.add(this.tExpr);
+        mandatoryArgs.add(this.tExpr);
       }
-      else{
-        param.expr.accept(this);
-        args.add(this.tExpr);
+      else if (p1 != null && p1.ident != null){
+        explicitArgs.add(p1);
+      }
+      else if (p1 != null && param.expr != null){
+        otherArgs.add(p1);
       }
       i++;
       // TODO : Traiter l'arity ici parce que j'ai enlevé la vérification au dessus
     }
+    i = 0;
+    for (TParameter param : callee.params) {
+      if (i < mandatoryArgs.size()){
+        args.add(mandatoryArgs.get(i));
+        defaultArgs.removeFirst();
+      }
+      else {
+        boolean found = false;
+        // if (i-size < explicitArgs.size()) {
+          for (Parameter p : explicitArgs){
+            if (p.ident.id.equals(param.var.name)){
+              if (found)
+                Typing.error(e.f.loc, "Multiple values for the same parameter");
+              p.expr.accept(this);
+              args.add(this.tExpr);
+              found = true;
+              defaultArgs.removeFirst();
+            }
+          }
+          if (!found){
+            Expr expr2;
+            try {
+              Parameter p2 = otherArgs.removeFirst();
+              expr2 = p2.expr;
+              defaultArgs.removeFirst();
+            } catch (Exception e1) {
+              TParameter p2 = defaultArgs.removeFirst();
+              expr2 = p2.expr;
+            }
+            expr2.accept(this);
+            args.add(this.tExpr);
+          }
+      }
+      i++;
+    }
+    // if (explicitArgs.size() > 0 || otherArgs.size()> 0)
+    //   Typing.error(e.f.loc, "Bad arity");
 
     if (Typing.isSpecialCall(name)) {
       switch (name) {
