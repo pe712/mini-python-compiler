@@ -90,7 +90,8 @@ class Compiler implements TVisitor {
   @Override
   public void visit(TCint c) {
     asm.merge(BuiltInFunctions.allocateTCint());
-    asm.movq(c.c.i, "8(%rax)"); // data
+    asm.movq(c.c.i, "%rsi"); // temp register
+    asm.movq("%rsi", "8(%rax)"); // data
   }
 
   @Override
