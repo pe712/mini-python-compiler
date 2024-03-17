@@ -1,26 +1,30 @@
-# Définition de la fonction avec des paramètres obligatoires et optionnels
-def ma_fonction(parametre_obligatoire, parametre_optionnel1="valeur_par_defaut1", parametre_optionnel2="valeur_par_defaut2"):
-    print("Paramètre obligatoire:" + parametre_obligatoire)
-    print("Paramètre optionnel 1:" + parametre_optionnel1)
-    print("Paramètre optionnel 2:" + parametre_optionnel2)
+# triangle de Pascal modulo 7
 
-# Tests avec différentes combinaisons de paramètres
-# Test 1 : Fournir uniquement le paramètre obligatoire
-print("Test 1")
-ma_fonction("obligatoire")
+def print_row(r, i):
+    s = ""
+    for j in list(range(i+1)):
+        if r[j]:
+            s = "*" + s
+        else:
+            s = "0" + s
+    print(s)
 
-# Test 2 : Fournir tous les paramètres
-print("Test 2")
-ma_fonction("obligatoire", "optionnel1", "optionnel2")
+def compute_row(r, j):
+    v = 0
+    if j == 0:
+        v = 1
+    else:
+        v = (r[j] + r[j-1]) % 7
+    r[j] = v
+    if j > 0: compute_row(r, j-1)
 
-# Test 3 : Fournir le paramètre obligatoire et un paramètre optionnel
-print("Test 3")
-ma_fonction("obligatoire", "optionnel1")
+def main():
+    # h = 40
+    h = 10
+    r = list(range(h+1))
+    for i in list(range(h)):
+        r[i] = 0
+        compute_row(r, i)
+        print_row(r, i)
 
-# Test 4 : Fournir le paramètre obligatoire et un autre paramètre optionnel
-print("Test 4")
-ma_fonction("obligatoire", parametre_optionnel2="optionnel2")
-
-# Test 5 : Fournir le paramètre obligatoire et spécifier les paramètres optionnels dans un ordre différent
-print("Test 5")
-ma_fonction("obligatoire", parametre_optionnel2="optionnel2", parametre_optionnel1="optionnel1")
+main ()
