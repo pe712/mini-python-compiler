@@ -3,7 +3,6 @@ package mini_python;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.util.HashSet;
 import java.util.LinkedList;
 
 /** une étiquette (Lab) ou une instruction (Asm) */
