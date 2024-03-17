@@ -1,0 +1,20 @@
+Test 1
+Paramètre obligatoire:obligatoire
+Paramètre optionnel 1:valeur_par_defaut1
+Paramètre optionnel 2:valeur_par_defaut2
+Test 2
+Paramètre obligatoire:obligatoire
+Paramètre optionnel 1:optionnel1
+Paramètre optionnel 2:optionnel2
+Test 3
+Paramètre obligatoire:obligatoire
+Paramètre optionnel 1:optionnel1
+Paramètre optionnel 2:valeur_par_defaut2
+Test 4
+Paramètre obligatoire:obligatoire
+Paramètre optionnel 1:valeur_par_defaut1
+Paramètre optionnel 2:optionnel2
+Test 5
+Paramètre obligatoire:obligatoire
+Paramètre optionnel 1:optionnel1
+Paramètre optionnel 2:optionnel2
