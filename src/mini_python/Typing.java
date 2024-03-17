@@ -37,8 +37,8 @@ class Typing {
         Variable variable = Variable.mkVariable(varName);
         if (params.contains(variable))
           error(def.f.loc, "Formal parameters should be pairwise distincts");
-        else{
-          TParameter tparam = new TParameter(param.expr,variable);
+        else {
+          TParameter tparam = new TParameter(param.expr, variable);
           params.add(tparam);
         }
       }
@@ -73,7 +73,7 @@ class TyperVisitor implements Visitor {
   public TyperVisitor(TFile tfile) {
     this.tfile = tfile;
     LinkedList<TParameter> paramsLen = new LinkedList<TParameter>();
-    paramsLen.add( new TParameter(null,Variable.mkVariable("l")));
+    paramsLen.add(new TParameter(null, Variable.mkVariable("l")));
     len = new Function("len", paramsLen);
   }
 
@@ -144,78 +144,70 @@ class TyperVisitor implements Visitor {
 
     // resolve to the corresponding function if possible
     Function callee = this.functions.get(name);
+    LinkedList<TExpr> args = new LinkedList<TExpr>();
 
     if (Typing.isSpecialCall(name)) {
       if (e.l.size() != 1)
         Typing.error(e.f.loc, "Bad arity for len, list, range");
-      
+      for (Parameter param : e.l) {
+        Expr exp = param.expr;
+        exp.accept(this);
+        args.add(this.tExpr);
+      }
     } else {
       if (callee == null)
         Typing.error(e.f.loc, "Function is not defined");
-      else if (callee.params.size() != e.l.size()) {
-        // Typing.error(e.f.loc, "Bad arity");
-      }
-    }
-
-    // get actual parameters
-    LinkedList<TExpr> args = new LinkedList<TExpr>();
-    LinkedList<Parameter> explicitArgs = new LinkedList<Parameter>();
-    LinkedList<TParameter> defaultArgs = new LinkedList<TParameter>();
-    int i = 0;
-    Parameter p1;
-    boolean keyword = false;
-    if (e.l.size() > callee.params.size())
-      Typing.error(e.f.loc, "Too many arguments");
-    for (TParameter param : callee.params) {
-      // System.out.println(param.var.name);
-      try {
-        p1 = e.l.get(i);
-      } catch (IndexOutOfBoundsException e1) {
-        p1 = null;
-      }
-      if (p1 == null && param.expr == null)
-        Typing.error(e.f.loc, "Missing argument");
-      if (p1 != null && p1.ident == null ){
-        if (keyword)
-          Typing.error(e.f.loc, "Positional argument cannot appear after keyword arguments");
-        p1.expr.accept(this);
-        args.add(this.tExpr);
-      }
-      else if (p1 != null && p1.ident != null){
-        System.out.println(param.var.name);
-        keyword = true;
-        explicitArgs.add(p1);
-        defaultArgs.add(param);
-      }
       else {
-        System.out.println("default");
-        keyword = true;
-        defaultArgs.add(param);
-      }
-      i++;
-      // TODO : Traiter l'arity ici parce que j'ai enlevé la vérification au dessus
-    }
-    System.out.println("fini  FOR");
-    boolean found;
-    System.out.println("defaultArgs.size() : " + defaultArgs.size());
-    System.out.println(defaultArgs);
-    for (TParameter param : defaultArgs){
-      System.out.println("passage");
-      System.out.println(param.var.name);
-      found = false;
-      for (Parameter p : explicitArgs){
-        if (p.ident.id.equals(param.var.name)){
-          System.out.println("trouvé");
-          p.expr.accept(this);
-          args.add(this.tExpr);
-          found = true;
+        // Typing.error(e.f.loc, "Bad arity");
+
+        // get actual parameters
+        LinkedList<Parameter> explicitArgs = new LinkedList<Parameter>();
+        LinkedList<TParameter> defaultArgs = new LinkedList<TParameter>();
+        int i = 0;
+        Parameter p1;
+        boolean keyword = false;
+        if (e.l.size() > callee.params.size())
+          Typing.error(e.f.loc, "Too many arguments");
+        for (TParameter param : callee.params) {
+          // System.out.println(param.var.name);
+          try {
+            p1 = e.l.get(i);
+          } catch (IndexOutOfBoundsException e1) {
+            p1 = null;
+          }
+          if (p1 == null && param.expr == null)
+            Typing.error(e.f.loc, "Missing argument");
+          if (p1 != null && p1.ident == null) {
+            if (keyword)
+              Typing.error(e.f.loc, "Positional argument cannot appear after keyword arguments");
+            p1.expr.accept(this);
+            args.add(this.tExpr);
+          } else if (p1 != null && p1.ident != null) {
+            keyword = true;
+            explicitArgs.add(p1);
+            defaultArgs.add(param);
+          } else {
+            keyword = true;
+            defaultArgs.add(param);
+          }
+          i++;
+        }
+        boolean found;
+        for (TParameter param : defaultArgs) {
+          found = false;
+          for (Parameter p : explicitArgs) {
+            if (p.ident.id.equals(param.var.name)) {
+              p.expr.accept(this);
+              args.add(this.tExpr);
+              found = true;
+            }
+          }
+          if (!found) {
+            param.expr.accept(this);
+            args.add(this.tExpr);
+          }
         }
       }
-      if (!found){
-        param.expr.accept(this);
-        args.add(this.tExpr);
-      }
-      System.out.println("fini");
     }
 
     if (Typing.isSpecialCall(name)) {
