@@ -3,6 +3,7 @@ package mini_python;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Map.Entry;
 
 class Typing {
   static boolean debug = false;
@@ -80,12 +81,21 @@ class TyperVisitor implements Visitor {
   public void visitFunction(Function f, Stmt s) {
     this.currentLocalVariables = new HashMap<String, Variable>();
     this.currentFunction = f;
+
     s.accept(this);
+
     // add a return None if nothing is present:
     if (!f.name.equals("__main__") && this.tStmt instanceof TSblock) {
       TSblock block = (TSblock) this.tStmt;
       if (!(block.l.getLast() instanceof TSreturn))
         block.l.add(new TSreturn(new TCnone(new Cnone())));
+    }
+
+    // add all global variable before creating the TDef
+    if (this.tfile.l.size() > 0) {
+      for (Entry<String, Variable> entry : this.tfile.l.getFirst().localVariables.entrySet()) {
+        this.currentLocalVariables.putIfAbsent(entry.getKey(), entry.getValue());
+      }
     }
     this.tfile.l.add(new TDef(f, this.tStmt, this.currentLocalVariables));
   }
@@ -131,7 +141,9 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Eident e) {
-    Variable variable = getVariable(e.x);
+    Variable variable = getLocalVariable(e.x);
+    if (variable == null)
+      variable = getGlobalVariable(e.x);
     if (variable == null)
       Typing.error(e.x.loc, e.x.id + " is not defined");
     else
@@ -270,7 +282,7 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sassign s) {
-    Variable variable = getVariable(s.x);
+    Variable variable = getLocalVariable(s.x); // warning : cannot assign a global variable
     if (variable == null)
       variable = addVariable(s.x);
     s.e.accept(this);
@@ -295,7 +307,9 @@ class TyperVisitor implements Visitor {
 
   @Override
   public void visit(Sfor s) {
-    Variable variable = getVariable(s.x);
+    Variable variable = getLocalVariable(s.x);
+    if (variable == null)
+      variable = getGlobalVariable(s.x);
     if (variable == null)
       variable = addVariable(s.x);
     s.e.accept(this);
@@ -320,11 +334,10 @@ class TyperVisitor implements Visitor {
     this.tStmt = new TSset(tExprSave1, tExprSave2, this.tExpr);
   }
 
-  private Variable getVariable(Ident ident) {
+  private Variable getLocalVariable(Ident ident) {
     /*
      * priority for resolving :
      * parameters of the current Function
-     * global variables (local of __main__)
      * local variables of the current Function
      */
     for (TParameter tparam : this.currentFunction.params) {
@@ -332,15 +345,16 @@ class TyperVisitor implements Visitor {
       if (variable.name.equals(ident.id))
         return variable;
     }
+
+    return this.currentLocalVariables.get(ident.id);
+  }
+
+  private Variable getGlobalVariable(Ident ident) {
     Variable variable = null;
     if (this.tfile.l.size() > 0) {
       variable = this.tfile.l.getFirst().localVariables.get(ident.id); // __main__ TDef
     }
-
-    if (variable != null)
-      return variable;
-
-    return this.currentLocalVariables.get(ident.id);
+    return variable;
   }
 
   private Variable addVariable(Ident ident) {

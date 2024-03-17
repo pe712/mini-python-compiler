@@ -2,6 +2,7 @@ package mini_python;
 
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map.Entry;
 
 class Compile {
 
@@ -14,10 +15,10 @@ class Compile {
     TDef mainTDef = file.l.poll();
 
     for (TDef tDef : file.l) {
-      compiler.visit(tDef);
+      compiler.visit(tDef, mainTDef);
     }
 
-    compiler.visit(mainTDef);
+    compiler.visitMain(mainTDef);
 
     compiler.terminate();
     return asm;
@@ -37,18 +38,30 @@ class Compiler implements TVisitor {
     asm.call("exit");
   }
 
-  public void visit(TDef tDef) {
-    String name;
-    if (tDef.f.name.equals("__main__")) {
-      name = "main";
-    } else
-      name = tDef.f.name;
+  public void visitMain(TDef mainTDef) {
+    String name = "main";
     asm.initFrame(name);
-    asm.subq(tDef.localVariables.size() * 8, "%rsp");
+    // allocate for global variable
+    asm.subq(mainTDef.localVariables.size() * 8, "%rsp");
+    mainTDef.body.accept(this);
+  }
+
+  public void visit(TDef tDef, TDef mainTDef) {
+    asm.initFrame(tDef.f.name);
+    int frameofs = tDef.localVariables.size() * 8;
+    // allocate for local variable
+    asm.subq(frameofs, "%rsp");
+    // load global variables
+    for (Entry<String, Variable> global : mainTDef.localVariables.entrySet()) {
+      Variable local = tDef.localVariables.get(global.getKey());
+      if (local != null) {
+        // get value from previous frame
+        asm.movq((frameofs+8) + "(%rsp)", "%rsi"); // previous %rbp
+        asm.movq(global.getValue().ofs + "(%rsi)", "%rsi"); // global value
+        asm.movq("%rsi", local.ofs + "(%rbp)");
+      }
+    }
     tDef.body.accept(this);
-    // if (tDef.f.name.equals("__main__")){}
-    // else
-      // asm.retFrame();
   }
 
   public void init() {
@@ -220,7 +233,7 @@ class Compiler implements TVisitor {
     // load parameters on the stack
     Iterator<TExpr> backArgsIterator = e.l.descendingIterator();
     while (backArgsIterator.hasNext()) {
-      tmp ++;
+      tmp++;
       backArgsIterator.next().accept(this);
       asm.cmpq(4, "(%rax)");
       asm.je("arg_list_" + e.hashCode() + "_" + tmp);
@@ -383,7 +396,7 @@ class Compiler implements TVisitor {
     asm.call("exit");
 
     asm.label("for_list_" + s.hashCode());
-    // asm.call("copy"); // En pratique il ne faut pas faire de copie de la liste 
+    // asm.call("copy"); // En pratique il ne faut pas faire de copie de la liste
     asm.pushq("%r12");
     asm.pushq("%r14");
     asm.movq("8(%rax)", "%r12"); // size
@@ -580,7 +593,8 @@ class BuiltInFunctions {
     copyString.movq("8(%rax)", "%r12"); // n = size in bytes
     copyString.addq(17, "%r12");
 
-    // copy n*8 bytes + 16 and recurse => this is never used in practice, we never have to copy a list
+    // copy n*8 bytes + 16 and recurse => this is never used in practice, we never
+    // have to copy a list
     X86_64 copyList = new X86_64();
     copyList.movq("8(%rax)", "%r12"); // n = size in bytes
     copyList.movq("%r12", "%rdi");
@@ -600,11 +614,12 @@ class BuiltInFunctions {
 
     copyList.label("copyList_loop");
     copyList.pushq("%rax");
-    // copyList.pushq("%rbx"); 
+    // copyList.pushq("%rbx");
     // copyList.pushq("%r12");
     // copyList.pushq("%r11");
     copyList.movq("(%rax)", "%rax");
-    // copyList.call("copy"); // à voir si les call sur les listes se font par référence
+    // copyList.call("copy"); // à voir si les call sur les listes se font par
+    // référence
     // copyList.popq("%r11");
     // copyList.popq("%r12");
     // copyList.popq("%rbx");
@@ -883,17 +898,17 @@ class BuiltInFunctions {
     X86_64 listAdd = new X86_64();
     listAdd.movq("8(%rax)", "%r12"); // n1
     listAdd.movq("8(%rbx)", "%r13"); // n2
-    
-    listAdd.movq("%r12","%r14");
-    listAdd.addq("%r13", "%r14"); //n 
-    
+
+    listAdd.movq("%r12", "%r14");
+    listAdd.addq("%r13", "%r14"); // n
+
     listAdd.imulq(8, "%r12");
     listAdd.imulq(8, "%r13");
 
     listAdd.movq("%r13", "%rdi");
     listAdd.addq("%r12", "%rdi");
     listAdd.addq(16, "%rdi"); // size in bytes to allocate
-    
+
     listAdd.addq(16, "%rax");
     listAdd.addq(16, "%rbx");
 
@@ -1362,7 +1377,7 @@ class BuiltInFunctions {
     return divider;
   }
 
-    /*
+  /*
    * expect the two pointers in %rax and %rbx
    * result in %rax
    */
