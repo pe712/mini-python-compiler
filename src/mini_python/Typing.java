@@ -35,12 +35,12 @@ class Typing {
       for (Parameter param : def.l) {
         String varName = param.ident.id;
         Variable variable = Variable.mkVariable(varName);
-        if (params.contains(variable))
-          error(def.f.loc, "Formal parameters should be pairwise distincts");
-        else {
-          TParameter tparam = new TParameter(param.expr, variable);
-          params.add(tparam);
+        for (TParameter tparam : params) {
+          if (tparam.var.name.equals(varName))
+            error(param.ident.loc, "Formal parameters should be pairwise distincts");
         }
+        TParameter tparam = new TParameter(param.expr, variable);
+        params.add(tparam);
       }
 
       typerVisitor.functions.put(name,
